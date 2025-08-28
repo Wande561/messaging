@@ -89,52 +89,52 @@ button[type="submit"] {
 
 @layer base {
   :root {
-    /* Purple color palette */
-    --primary: 267 83% 25%;          /* Deep purple */
-    --primary-light: 267 83% 35%;    /* Medium purple */
-    --primary-glow: 267 83% 45%;     /* Bright purple */
+    /* Navy/Baby Blue color palette */
+    --primary: 217 91% 60%;          /* Baby blue */
+    --primary-light: 217 100% 70%;   /* Light baby blue */
+    --primary-glow: 217 100% 80%;    /* Bright baby blue */
     --primary-foreground: 0 0% 100%; /* White text */
 
     /* Background system */
-    --background: 267 15% 8%;        /* Very dark purple */
-    --background-secondary: 267 20% 12%; /* Dark purple */
-    --foreground: 0 0% 95%;          /* Light text */
+    --background: 0 0% 100%;         /* White */
+    --background-secondary: 217 100% 97%; /* Very light blue */
+    --foreground: 217 32% 17%;       /* Navy text */
 
     /* Chat specific colors */
-    --chat-bubble-sent: 267 83% 25%;     /* User's message - primary purple */
+    --chat-bubble-sent: 217 91% 60%;     /* User's message - baby blue */
     --chat-bubble-received: 0 0% 98%;    /* Other's message - white */
-    --chat-bubble-received-text: 267 15% 25%; /* Dark text for received */
+    --chat-bubble-received-text: 217 32% 17%; /* Navy text for received */
 
     /* Cards and surfaces */
-    --card: 267 20% 12%;
-    --card-foreground: 0 0% 95%;
-    --card-border: 267 30% 20%;
+    --card: 0 0% 100%;               /* White */
+    --card-foreground: 217 32% 17%;  /* Navy text */
+    --card-border: 217 91% 85%;      /* Light blue border */
 
     /* Sidebar colors */
-    --sidebar-background: 267 25% 10%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-hover: 267 30% 15%;
-    --sidebar-active: 267 83% 25%;
+    --sidebar-background: 217 100% 97%;
+    --sidebar-foreground: 217 32% 17%;
+    --sidebar-hover: 217 91% 90%;
+    --sidebar-active: 217 91% 60%;
 
     /* Interactive elements */
-    --input: 267 20% 15%;
-    --input-background: 267 20% 15%;
-    --input-border: 267 30% 25%;
-    --input-focus: 267 83% 45%;
+    --input: 0 0% 100%;              /* White input background */
+    --input-background: 0 0% 100%;
+    --input-border: 217 91% 85%;     /* Light blue border */
+    --input-focus: 217 91% 60%;      /* Baby blue focus */
 
     /* Utility colors */
-    --muted: 267 15% 20%;
-    --muted-foreground: 0 0% 65%;
-    --border: 267 25% 20%;
-    --ring: 267 83% 45%;
+    --muted: 217 91% 95%;            /* Very light blue */
+    --muted-foreground: 217 16% 46%; /* Medium blue text */
+    --border: 217 91% 85%;           /* Light blue border */
+    --ring: 217 91% 60%;             /* Baby blue ring */
 
     /* Additional required variables */
-    --secondary: 267 20% 12%;
-    --secondary-foreground: 0 0% 95%;
-    --accent: 267 30% 15%;
-    --accent-foreground: 0 0% 95%;
-    --popover: 267 20% 12%;
-    --popover-foreground: 0 0% 95%;
+    --secondary: 217 100% 97%;       /* Light blue */
+    --secondary-foreground: 217 32% 17%; /* Navy text */
+    --accent: 217 91% 90%;           /* Light blue accent */
+    --accent-foreground: 217 32% 17%; /* Navy text */
+    --popover: 0 0% 100%;            /* White */
+    --popover-foreground: 217 32% 17%; /* Navy text */
 
     /* Success, warning, error */
     --success: 142 76% 36%;
@@ -143,14 +143,14 @@ button[type="submit"] {
     --destructive-foreground: 0 0% 98%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(267 83% 25%), hsl(267 83% 35%));
-    --gradient-purple-glow: linear-gradient(135deg, hsl(267 83% 45%), hsl(267 83% 55%));
-    --gradient-sidebar: linear-gradient(180deg, hsl(267 25% 10%), hsl(267 20% 8%));
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
+    --gradient-blue-glow: linear-gradient(135deg, hsl(217 100% 80%), hsl(217 100% 90%));
+    --gradient-sidebar: linear-gradient(180deg, hsl(217 100% 97%), hsl(217 100% 95%));
 
     /* Shadows and effects */
-    --shadow-purple: 0 10px 30px -10px hsl(267 83% 25% / 0.4);
-    --shadow-glow: 0 0 40px hsl(267 83% 45% / 0.3);
-    --shadow-message: 0 2px 10px hsl(267 15% 8% / 0.2);
+    --shadow-blue: 0 10px 30px -10px hsl(217 91% 60% / 0.4);
+    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.3);
+    --shadow-message: 0 2px 10px hsl(217 32% 17% / 0.1);
 
     /* Animation timing */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -162,11 +162,11 @@ button[type="submit"] {
 
 @layer base {
   * {
-    @apply border-gray-200;
+    @apply border-blue-200;
   }
 
   body {
-    @apply bg-white text-blue-900;
+    @apply bg-blue-50 text-blue-900;
   }
 }
 

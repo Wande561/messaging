@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, User, Mail, MessageSquare } from "lucide-react";
-import { AuthClient } from "@dfinity/auth-client";
-import { createActor, canisterId as backendCanisterId } from "../../../declarations/messaging_backend/index.js";
+import { useAuth } from "@/context/AppContext";
 import { Principal } from "@dfinity/principal";
 
 interface SignupFormData {
@@ -31,42 +30,10 @@ export function SignupPage({ onSignupComplete }: SignupPageProps) {
     profilePictureUrl: "",
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [principal, setPrincipal] = useState<string>("");
-  const authClientRef = useRef<AuthClient | null>(null);
+  const { backendActor, identity, logout, registerUser, updateProfile, getUserMessages, checkUserExists } = useAuth();
 
-  useEffect(() => {
-    AuthClient.create().then((client) => {
-      authClientRef.current = client;
-      client.isAuthenticated().then((authenticated) => {
-        if (authenticated) {
-          const identity = client.getIdentity();
-          setPrincipal(identity.getPrincipal().toText());
-          setIsAuthenticated(true);
-        }
-      });
-    });
-  }, []);
-
-  const handleLogin = async () => {
-    const client = authClientRef.current;
-    if (!client) return;
-    await client.login({
-      identityProvider: "https://identity.ic0.app",
-      onSuccess: async () => {
-        const identity = client.getIdentity();
-        setPrincipal(identity.getPrincipal().toText());
-        setIsAuthenticated(true);
-      },
-    });
-  };
-
-  const handleLogout = async () => {
-    const client = authClientRef.current;
-    if (!client) return;
-    await client.logout();
-    setPrincipal("");
-    setIsAuthenticated(false);
+  const handleLogout = () => {
+    logout();
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,39 +51,70 @@ export function SignupPage({ onSignupComplete }: SignupPageProps) {
     }
   };
 
-  const fetchUserMessages = async (principalText: string) => {
-    try {
-      const actor = createActor(backendCanisterId, {
-        agentOptions: { identity: authClientRef.current?.getIdentity() },
-      });
-      const messages = await actor.getUserMessages(Principal.fromText(principalText));
-      return messages;
-    } catch (err) {
-      return [];
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.username || !isAuthenticated || !principal) return;
+    if (!formData.email || !formData.username || !identity) return;
     setIsLoading(true);
     try {
-      const actor = createActor(backendCanisterId, {
-        agentOptions: { identity: authClientRef.current?.getIdentity() },
+      const principal = identity.getPrincipal().toText();
+      console.log("Starting registration process for:", {
+        username: formData.username,
+        principal
       });
-      const result = await actor.registerUser(formData.username, Principal.fromText(principal));
-      if (result) {
-        await actor.updateProfile(
+      
+      // First check if user already exists
+      const existingUser = await checkUserExists();
+      if (existingUser) {
+        console.log("User already exists, updating profile instead:", existingUser);
+        // User exists, just update profile
+        const profileResult = await updateProfile(
           formData.username,
           formData.profilePictureUrl || "",
-          formData.status || "",
-          Principal.fromText(principal)
+          formData.status || ""
         );
-        localStorage.setItem("principal", principal);
-        const userMessages = await fetchUserMessages(principal);
-        onSignupComplete({ ...formData, userMessages });
+        
+        if (profileResult) {
+          console.log("Profile update successful");
+          localStorage.setItem("principal", principal);
+          const userMessages = await getUserMessages();
+          onSignupComplete({ ...formData, userMessages: userMessages || [] });
+        } else {
+          console.error("Failed to update existing user profile");
+          alert("Failed to update profile. Please try again.");
+        }
+      } else {
+        // User doesn't exist, register new user
+        console.log("User doesn't exist, registering new user...");
+        const registrationResult = await registerUser(formData.username);
+        console.log("Registration result:", registrationResult);
+        
+        if (registrationResult) {
+          console.log("Registration successful, updating profile...");
+          // Update profile using the context function
+          const profileResult = await updateProfile(
+            formData.username,
+            formData.profilePictureUrl || "",
+            formData.status || ""
+          );
+          
+          if (profileResult) {
+            console.log("Profile update successful");
+            localStorage.setItem("principal", principal);
+            // Get user messages using the context function
+            const userMessages = await getUserMessages();
+            onSignupComplete({ ...formData, userMessages: userMessages || [] });
+          } else {
+            console.error("Failed to update profile");
+            alert("Failed to update profile. Please try again.");
+          }
+        } else {
+          console.error("Failed to register user");
+          alert("Failed to register user. Please try again.");
+        }
       }
     } catch (err) {
+      console.error("Signup failed:", err);
+      alert("Signup failed. Please try again.");
     }
     setIsLoading(false);
   };
@@ -138,11 +136,14 @@ export function SignupPage({ onSignupComplete }: SignupPageProps) {
           <p className="text-gray-600">Join the conversation and connect with others</p>
         </div>
         <div className="mb-4 flex justify-center">
-          {!isAuthenticated ? (
-            <Button type="button" onClick={handleLogin} className="bg-blue-500 text-white">Login with Internet Identity</Button>
-          ) : (
-            <Button type="button" onClick={handleLogout} className="bg-gray-300 text-blue-900">Logout</Button>
-          )}
+          <Button 
+            type="button" 
+            onClick={handleLogout} 
+            variant="outline"
+            className="border-blue-300 text-blue-900 hover:bg-gray-400 bg-white"
+          >
+            Switch Account
+          </Button>
         </div>
         {/* Signup Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -228,7 +229,7 @@ export function SignupPage({ onSignupComplete }: SignupPageProps) {
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isLoading || !formData.email || !formData.username || !isAuthenticated}
+            disabled={isLoading || !formData.email || !formData.username || !identity}
             className="w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-3 rounded-xl transition-all duration-200 disabled:opacity-50"
           >
             {isLoading ? "Creating Account..." : "Create Account"}

@@ -5,6 +5,7 @@ import Array "mo:base/Array";
 import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Prim "mo:prim";
+import Buffer "mo:base/Buffer";
 
 persistent actor MessagingApp {
 
@@ -32,8 +33,24 @@ persistent actor MessagingApp {
     timestamp : Time.Time;
   };
 
+  // transient var users = TrieMap.TrieMap<Principal, User>(Principal.equal, Principal.hash);
+  // transient var messages = TrieMap.TrieMap<Text, [Message]>(Text.equal, Text.hash);
+
+  stable var stableUsers : [(Principal, User)] = [];
+  stable var stableMessages : [(Text, [Message])] = [];
+
   transient var users = TrieMap.TrieMap<Principal, User>(Principal.equal, Principal.hash);
   transient var messages = TrieMap.TrieMap<Text, [Message]>(Text.equal, Text.hash);
+  
+  system func preupgrade() {
+    stableUsers := Iter.toArray(users.entries());
+    stableMessages := Iter.toArray(messages.entries());
+  };
+
+  system func postupgrade() {
+    users := TrieMap.fromEntries<Principal, User>(stableUsers.vals(), Principal.equal, Principal.hash);
+    messages := TrieMap.fromEntries<Text, [Message]>(stableMessages.vals(), Text.equal, Text.hash);
+  };
 
   func getChatId(a : Principal, b : Principal) : Text {
     if (Principal.toText(a) < Principal.toText(b)) {
@@ -106,14 +123,14 @@ persistent actor MessagingApp {
 
   public query func searchUsers(keyword : Text) : async [(Principal, PublicUser)] {
     let lowerKey = Text.map(keyword, Prim.charToLower);
-    var results : [(Principal, PublicUser)] = [];
+    let results = TrieMap.TrieMap<Principal, PublicUser>(Principal.equal, Principal.hash);
     for ((p, u) in users.entries()) {
       let lowerName = Text.map(u.username, Prim.charToLower);
       if (Text.contains(lowerName, #text lowerKey)) {
-        results := Array.append(results, [(p, makePublicUser(u))]);
+        results.put(p, makePublicUser(u));
       };
     };
-    results
+    Iter.toArray(results.entries());
   };
 
   public shared func sendMessage(receiver : Principal, text : Text, caller : Principal) : async Bool {
@@ -133,7 +150,9 @@ persistent actor MessagingApp {
       case (null) { [] };
       case (?arr) { arr };
     };
-    messages.put(chatId, Array.append(oldMsgs, [newMsg]));
+    let msgBuffer = Buffer.fromArray<Message>(oldMsgs);
+    msgBuffer.add(newMsg);
+    messages.put(chatId, Buffer.toArray(msgBuffer));
     return true;
   };
 
@@ -147,7 +166,7 @@ persistent actor MessagingApp {
   };
 
   public query func getUserMessages(caller : Principal) : async [(Principal, [Message])] {
-    var userMessages : [(Principal, [Message])] = [];
+    let userMessages = TrieMap.TrieMap<Principal, [Message]>(Principal.equal, Principal.hash);
     for ((chatId, msgs) in messages.entries()) {
       let partsArr = Iter.toArray(Text.split(chatId, #text "|"));
       if (Array.size(partsArr) == 2) {
@@ -155,11 +174,11 @@ persistent actor MessagingApp {
         let p2 = Principal.fromText(partsArr[1]);
         if (p1 == caller or p2 == caller) {
           let other = if (p1 == caller) { p2 } else { p1 };
-          userMessages := Array.append(userMessages, [(other, msgs)]);
+          userMessages.put(other, msgs);
         };
       };
     };
-    userMessages;
+    Iter.toArray(userMessages.entries());
   };
 
   public query func getUser(p : Principal) : async ?PublicUser {
@@ -167,6 +186,37 @@ persistent actor MessagingApp {
       case null { null };
       case (?u) { ?makePublicUser(u) };
     }
+  };
+
+  public query func searchMessages(searchTerm : Text, caller : Principal) : async [(Principal, [Message])] {
+    let who = caller;
+    let lowerSearchTerm = Text.map(searchTerm, Prim.charToLower);
+    let searchResults = TrieMap.TrieMap<Principal, [Message]>(Principal.equal, Principal.hash);
+    
+    for ((chatId, msgs) in messages.entries()) {
+      let partsArr = Iter.toArray(Text.split(chatId, #text "|"));
+      if (Array.size(partsArr) == 2) {
+        let p1 = Principal.fromText(partsArr[0]);
+        let p2 = Principal.fromText(partsArr[1]);
+        if (p1 == who or p2 == who) {
+          let other = if (p1 == who) { p2 } else { p1 };
+          let matchingMessages = Buffer.Buffer<Message>(0);
+          
+          for (msg in msgs.vals()) {
+            let lowerText = Text.map(msg.text, Prim.charToLower);
+            if (Text.contains(lowerText, #text lowerSearchTerm)) {
+              matchingMessages.add(msg);
+            };
+          };
+          
+          if (matchingMessages.size() > 0) {
+            searchResults.put(other, Buffer.toArray(matchingMessages));
+          };
+        };
+      };
+    };
+    
+    Iter.toArray(searchResults.entries());
   };
   
 }
