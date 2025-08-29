@@ -1,9 +1,9 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Send, MoreVertical, Phone, Video, Search } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AppContext";
+import { useAuth } from "../context/AppContext";
 import { Principal } from "@dfinity/principal";
 
 interface Message {
@@ -18,7 +18,7 @@ interface Message {
 }
 
 interface ChatAreaProps {
-  conversationId?: string; // This will be the Principal ID as string
+  conversationId?: string; 
   conversationName?: string;
   conversationAvatar?: string;
   isOnline?: boolean;

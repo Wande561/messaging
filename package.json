@@ -5,11 +5,10 @@
   },
   "name": "messaging",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "prebuild": "npm run prebuild --workspaces --if-present",
-    "pretest": "npm run prebuild --workspaces --if-present",
-    "start": "npm start --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "build": "pnpm --filter messaging_frontend build",
+    "prebuild": "pnpm --filter messaging_frontend prebuild",
+    "pretest": "pnpm --filter messaging_frontend prebuild",
+    "start": "concurrently \"pnpm --filter messaging_frontend start\""
   },
   "type": "module",
   "workspaces": [
@@ -19,7 +18,32 @@
     "@dfinity/agent": "^3.2.1",
     "@dfinity/auth-client": "^3.2.1",
     "@tailwindcss/vite": "^4.1.12",
-    "tailwindcss": "^4.1.12"
+    "concurrently": "^9.2.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.0.0",
+    "cross-fetch": "^4.1.0",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.3.0",
+    "emoji-picker-react": "^4.13.2",
+    "input-otp": "^1.2.4",
+    "lucide-react": "^0.462.0",
+    "next-themes": "^0.3.0",
+    "react": "^18.3.1",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.0",
+    "react-icons": "^5.5.0",
+    "react-resizable-panels": "^2.1.3",
+    "react-router-dom": "^6.30.1",
+    "react-toastify": "^11.0.5",
+    "recharts": "^2.12.7",
+    "sonner": "^1.5.0",
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss": "^4.1.11",
+    "tailwindcss-animate": "^1.0.7",
+    "vaul": "^0.9.3",
+    "vite": "^7.0.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^24.3.0"

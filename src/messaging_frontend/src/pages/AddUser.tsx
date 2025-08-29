@@ -39,7 +39,7 @@ export function AddUserPage({ onBack, onStartConversation }: AddUserPageProps) {
     try {
       const results = await searchUsers(searchQuery);
       if (results) {
-        const formattedResults: SearchResult[] = results.map(([principal, user]) => ({
+        const formattedResults: SearchResult[] = results.map(([principal, user]: [Principal, any]) => ({
           principal,
           user
         }));

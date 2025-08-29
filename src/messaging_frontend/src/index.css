@@ -87,86 +87,64 @@ button[type="submit"] {
   color: #888;
 }
 
-@layer base {
-  :root {
-    /* Navy/Baby Blue color palette */
-    --primary: 217 91% 60%;          /* Baby blue */
-    --primary-light: 217 100% 70%;   /* Light baby blue */
-    --primary-glow: 217 100% 80%;    /* Bright baby blue */
-    --primary-foreground: 0 0% 100%; /* White text */
+:root {
+  /* Blue color palette for our messaging app */
+  --primary: 221 83% 53%;          /* Blue-600 */
+  --primary-light: 221 83% 63%;    /* Blue-500 */
+  --primary-glow: 221 83% 73%;     /* Blue-400 */
+  --primary-foreground: 0 0% 100%; /* White text */
 
-    /* Background system */
-    --background: 0 0% 100%;         /* White */
-    --background-secondary: 217 100% 97%; /* Very light blue */
-    --foreground: 217 32% 17%;       /* Navy text */
+  /* Background system - keeping it light */
+  --background: 0 0% 100%;         /* White background */
+  --background-secondary: 221 100% 98%; /* Very light blue */
+  --foreground: 221 39% 11%;       /* Blue-900 text */
 
-    /* Chat specific colors */
-    --chat-bubble-sent: 217 91% 60%;     /* User's message - baby blue */
-    --chat-bubble-received: 0 0% 98%;    /* Other's message - white */
-    --chat-bubble-received-text: 217 32% 17%; /* Navy text for received */
+  /* Chat specific colors */
+  --chat-bubble-sent: 221 83% 53%;     /* User's message - blue */
+  --chat-bubble-received: 0 0% 98%;    /* Other's message - white */
+  --chat-bubble-received-text: 221 39% 11%; /* Blue-900 text */
 
-    /* Cards and surfaces */
-    --card: 0 0% 100%;               /* White */
-    --card-foreground: 217 32% 17%;  /* Navy text */
-    --card-border: 217 91% 85%;      /* Light blue border */
+  /* Cards and surfaces */
+  --card: 0 0% 100%;
+  --card-foreground: 221 39% 11%;
+  --card-border: 220 13% 91%;      /* Gray-200 */
 
-    /* Sidebar colors */
-    --sidebar-background: 217 100% 97%;
-    --sidebar-foreground: 217 32% 17%;
-    --sidebar-hover: 217 91% 90%;
-    --sidebar-active: 217 91% 60%;
+  /* Interactive elements */
+  --input: 0 0% 100%;
+  --input-background: 221 100% 98%;
+  --input-border: 220 13% 91%;
+  --input-focus: 221 83% 53%;
 
-    /* Interactive elements */
-    --input: 0 0% 100%;              /* White input background */
-    --input-background: 0 0% 100%;
-    --input-border: 217 91% 85%;     /* Light blue border */
-    --input-focus: 217 91% 60%;      /* Baby blue focus */
+  /* Utility colors - using blue theme */
+  --muted: 221 100% 96%;           /* Blue-50 */
+  --muted-foreground: 221 39% 11%; /* Blue-900 */
+  --border: 220 13% 91%;           /* Gray-200 */
+  --ring: 221 83% 53%;             /* Blue-600 */
 
-    /* Utility colors */
-    --muted: 217 91% 95%;            /* Very light blue */
-    --muted-foreground: 217 16% 46%; /* Medium blue text */
-    --border: 217 91% 85%;           /* Light blue border */
-    --ring: 217 91% 60%;             /* Baby blue ring */
+  /* Key fix: accent colors for button hover */
+  --accent: 221 100% 96%;          /* Blue-50 for hover background */
+  --accent-foreground: 221 83% 30%; /* Blue-700 for hover text */
+  
+  --secondary: 221 100% 96%;       /* Blue-50 */
+  --secondary-foreground: 221 39% 11%; /* Blue-900 */
+  --popover: 0 0% 100%;
+  --popover-foreground: 221 39% 11%;
 
-    /* Additional required variables */
-    --secondary: 217 100% 97%;       /* Light blue */
-    --secondary-foreground: 217 32% 17%; /* Navy text */
-    --accent: 217 91% 90%;           /* Light blue accent */
-    --accent-foreground: 217 32% 17%; /* Navy text */
-    --popover: 0 0% 100%;            /* White */
-    --popover-foreground: 217 32% 17%; /* Navy text */
+  /* Success, warning, error */
+  --success: 142 76% 36%;
+  --warning: 38 92% 50%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
 
-    /* Success, warning, error */
-    --success: 142 76% 36%;
-    --warning: 38 92% 50%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
-    --gradient-blue-glow: linear-gradient(135deg, hsl(217 100% 80%), hsl(217 100% 90%));
-    --gradient-sidebar: linear-gradient(180deg, hsl(217 100% 97%), hsl(217 100% 95%));
-
-    /* Shadows and effects */
-    --shadow-blue: 0 10px 30px -10px hsl(217 91% 60% / 0.4);
-    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.3);
-    --shadow-message: 0 2px 10px hsl(217 32% 17% / 0.1);
-
-    /* Animation timing */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    --radius: 0.75rem;
-  }
+  --radius: 0.75rem;
 }
 
-@layer base {
-  * {
-    @apply border-blue-200;
-  }
+* {
+  border-color: rgb(229 231 235);
+}
 
-  body {
-    @apply bg-blue-50 text-blue-900;
-  }
+body {
+  background-color: white;
+  color: rgb(30 58 138);
 }
 

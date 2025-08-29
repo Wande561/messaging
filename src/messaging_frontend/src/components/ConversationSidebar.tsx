@@ -1,8 +1,8 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Search, Plus, Settings, LogOut, UserPlus, Wallet } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AppContext";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { useAuth } from "../context/AppContext";
 import { useState, useCallback } from "react";
 import { Principal } from "@dfinity/principal";
 
@@ -56,7 +56,7 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
     try {
       const results = await searchUsers(query);
       if (results) {
-        const formattedResults: SearchResult[] = results.map(([principal, user]) => ({
+        const formattedResults: SearchResult[] = results.map(([principal, user]: [Principal, any]) => ({
           principal,
           user
         }));
