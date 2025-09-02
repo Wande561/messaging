@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -177,7 +177,7 @@ export function WalletPage({ onBack }: WalletPageProps) {
                     <Input
                       id="recipient"
                       value={sendForm.recipient}
-                      onChange={(e) => setSendForm(prev => ({ ...prev, recipient: e.target.value }))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendForm(prev => ({ ...prev, recipient: e.target.value }))}
                       placeholder="Enter Principal ID or Account Identifier"
                       className="border-blue-200 focus:border-blue-500 text-blue-900"
                       required
@@ -196,7 +196,7 @@ export function WalletPage({ onBack }: WalletPageProps) {
                       step="0.00000001"
                       min="0.00000001"
                       value={sendForm.amount}
-                      onChange={(e) => setSendForm(prev => ({ ...prev, amount: e.target.value }))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendForm(prev => ({ ...prev, amount: e.target.value }))}
                       placeholder="0.00000000"
                       className="border-blue-200 focus:border-blue-500 text-blue-900"
                       required
@@ -212,7 +212,7 @@ export function WalletPage({ onBack }: WalletPageProps) {
                     <Textarea
                       id="memo"
                       value={sendForm.memo}
-                      onChange={(e) => setSendForm(prev => ({ ...prev, memo: e.target.value }))}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSendForm(prev => ({ ...prev, memo: e.target.value }))}
                       placeholder="Add a note for this transaction..."
                       rows={3}
                       className="border-blue-200 focus:border-blue-500 text-blue-900 resize-none"
@@ -273,7 +273,7 @@ export function WalletPage({ onBack }: WalletPageProps) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {transactions.map((tx, index) => (
+                    {transactions.map((tx: any, index: number) => (
                       <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-3">
                           {getTransactionIcon(tx.type)}

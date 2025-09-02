@@ -15,16 +15,25 @@ function Login() {
   
   const refreshData = async () => {
     if (!backendActor || !identity) return;
+    console.log("Login: refreshData called, fetching user data...");
+    
     try {
       const [allUsers, me] = await Promise.all([
         backendActor.searchUsers(""),
         backendActor.getUser(identity.getPrincipal()),
       ]);
+      
+      console.log("Login: fetched allUsers:", allUsers);
+      console.log("Login: fetched me:", me);
+      
       if (allUsers) setUsers(allUsers);
-      if (me && me.length > 0) {
-        setCurrentUser(me[0] ?? null);
+      if (me.length > 0 && me[0]) {
+        console.log("Login: User is registered, setting currentUser and navigating to chat");
+        setCurrentUser(me[0]);
         // After profile is complete, navigate to chat
         navigate('/chat');
+      } else {
+        console.log("Login: User not registered, staying on profile setup");
       }
     } catch (err) {
       console.log("Error refreshing data:", err);
@@ -33,6 +42,8 @@ function Login() {
 
   useEffect(() => {
     if (backendActor && isAuthenticated && identity) {
+      console.log("Login: User authenticated, checking registration status...");
+      console.log("Login: Principal:", identity.getPrincipal().toText());
       refreshData();
     }
   }, [isAuthenticated, backendActor, identity]);

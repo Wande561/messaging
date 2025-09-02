@@ -32,8 +32,21 @@ persistent actor MessagingApp {
     timestamp : Time.Time;
   };
 
-  transient var users = TrieMap.TrieMap<Principal, User>(Principal.equal, Principal.hash);
-  transient var messages = TrieMap.TrieMap<Text, [Message]>(Text.equal, Text.hash);
+  var usersEntries : [(Principal, User)] = [];
+  var messagesEntries : [(Text, [Message])] = [];
+
+  transient var users = TrieMap.fromEntries<Principal, User>(usersEntries.vals(), Principal.equal, Principal.hash);
+  transient var messages = TrieMap.fromEntries<Text, [Message]>(messagesEntries.vals(), Text.equal, Text.hash);
+
+  system func preupgrade() {
+    usersEntries := Iter.toArray(users.entries());
+    messagesEntries := Iter.toArray(messages.entries());
+  };
+
+  system func postupgrade() {
+    usersEntries := [];
+    messagesEntries := [];
+  };
 
   func getChatId(a : Principal, b : Principal) : Text {
     if (Principal.toText(a) < Principal.toText(b)) {

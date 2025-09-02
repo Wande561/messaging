@@ -3,7 +3,7 @@ import { Search, Plus, Settings, LogOut, UserPlus, Wallet } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AppContext";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Principal } from "@dfinity/principal";
 
 interface Conversation {
@@ -33,13 +33,71 @@ interface ConversationSidebarProps {
   onWalletClick?: () => void;
 }
 
-export function ConversationSidebar({ selectedConversationId, onConversationSelect, onSettingsClick, onAddUserClick, onWalletClick }: ConversationSidebarProps) {
-  const { logout, searchUsers } = useAuth();
+export interface ConversationSidebarRef {
+  refreshConversations: () => void;
+}
+
+export const ConversationSidebar = forwardRef<ConversationSidebarRef, ConversationSidebarProps>(
+  ({ selectedConversationId, onConversationSelect, onSettingsClick, onAddUserClick, onWalletClick }, ref) => {
+  const { logout, searchUsers, getUserConversations, getUser, identity } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+
+  // Expose refresh method to parent
+  useImperativeHandle(ref, () => ({
+    refreshConversations: loadConversations
+  }));
+
+  // Load conversations when component mounts or identity changes
+  useEffect(() => {
+    if (identity) {
+      loadConversations();
+    }
+  }, [identity]);
+
+  const loadConversations = async () => {
+    if (!identity) return;
+    
+    setIsLoadingConversations(true);
+    try {
+      const userConversations = await getUserConversations();
+      
+      if (userConversations && userConversations.length > 0) {
+        // Format conversations for the UI
+        const formattedConversations: Conversation[] = await Promise.all(
+          userConversations.map(async ([otherPrincipal, messages]: [Principal, any[]]) => {
+            // Get user info for the other participant
+            const userInfo = await getUser(otherPrincipal);
+            const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+            
+            return {
+              id: otherPrincipal.toText(),
+              name: userInfo?.username || `User ${otherPrincipal.toText().slice(0, 8)}...`,
+              lastMessage: lastMessage ? lastMessage.text : "No messages yet",
+              timestamp: lastMessage 
+                ? new Date(Number(lastMessage.timestamp) / 1000000).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })
+                : "",
+              unreadCount: 0, // TODO: Implement unread count logic
+              avatar: userInfo?.profilePicture || "/placeholder.svg"
+            };
+          })
+        );
+        
+        setConversations(formattedConversations);
+      }
+    } catch (error) {
+      console.error("Error loading conversations:", error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -83,6 +141,11 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
     setSearchQuery("");
     setShowSearchResults(false);
     setSearchResults([]);
+    
+    // Reload conversations to include the new one
+    setTimeout(() => {
+      loadConversations();
+    }, 1000); // Small delay to allow any message sending to complete
   };
 
   return (
@@ -92,15 +155,17 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-blue-900">Messages</h2>
           <div className="flex gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={onAddUserClick}
-              className="h-8 w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
-              title="Add New Contact"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {conversations.length === 0 && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onAddUserClick}
+                className="h-8 w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
+                title="Add New Contact"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -199,12 +264,29 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
       <div className="flex-1 h-6 overflow-y-auto">
         {!showSearchResults && (
           <>
-            <div className="p-4 border-b border-gray-100">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 Recent Conversations
               </h3>
+              {conversations.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={onAddUserClick}
+                  className="h-6 text-xs text-blue-600 hover:text-blue-700 hover:bg-gray-100"
+                  title="Add New Contact"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
+                </Button>
+              )}
             </div>
-            {conversations.length === 0 ? (
+            
+            {isLoadingConversations ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                   <Plus className="h-8 w-8 text-blue-500" />
@@ -253,7 +335,7 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
                         <p className="text-sm text-gray-600 truncate">
                           {conversation.lastMessage}
                         </p>
-                        {conversation.unreadCount && (
+                        {conversation.unreadCount && conversation.unreadCount > 0 && (
                           <span className="bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded-full min-w-[20px] text-center">
                             {conversation.unreadCount}
                           </span>
@@ -269,4 +351,6 @@ export function ConversationSidebar({ selectedConversationId, onConversationSele
       </div>
     </div>
   );
-}
+});
+
+ConversationSidebar.displayName = "ConversationSidebar";

@@ -1,7 +1,7 @@
 // src/pages/ProfileSetup.tsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "../context/AppContext";
-import { User, Mail } from "lucide-react";
+import { User, Mail, Upload, Camera } from "lucide-react";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -12,35 +12,95 @@ interface Props {
 
 function ProfileSetup({ onComplete }: Props) {
   const { backendActor, identity } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState("");
   const [profilePicture, setProfilePicture] = useState("");
   const [saving, setSaving] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File size must be less than 5MB");
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert("Please select an image file");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setProfilePicture(result);
+        setImagePreview(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const registerUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("ProfileSetup: Starting registration process...");
+    console.log("ProfileSetup: Username:", username);
+    console.log("ProfileSetup: Identity present:", !!identity);
+    console.log("ProfileSetup: BackendActor present:", !!backendActor);
+    
     if (backendActor && identity) {
       try {
         setSaving(true);
-        const result = await backendActor.registerUser(
-          username,
-          identity.getPrincipal()
-        );
+        const principal = identity.getPrincipal();
+        console.log("ProfileSetup: User principal:", principal.toText());
+        
+        // First check if user is already registered
+        console.log("ProfileSetup: Checking if user already exists...");
+        const existingUser = await backendActor.getUser(principal);
+        console.log("ProfileSetup: Existing user check result:", existingUser);
+        
+        if (existingUser && existingUser.length > 0) {
+          console.log("ProfileSetup: User already registered, skipping registration");
+          onComplete();
+          return;
+        }
+        
+        console.log("ProfileSetup: Calling registerUser...");
+        const result = await backendActor.registerUser(username, principal);
+        
+        console.log("ProfileSetup: registerUser result:", result);
+        
         if (result) {
+          console.log("ProfileSetup: Calling updateProfile...");
+          
           await backendActor.updateProfile(
             username,
             profilePicture,
             status || "Available",
-            identity.getPrincipal()
+            principal
           );
+          
+          console.log("ProfileSetup: Profile updated successfully, calling onComplete...");
           onComplete(); // refresh users + current user
+        } else {
+          console.error("ProfileSetup: registerUser returned false");
+          console.error("ProfileSetup: This might indicate the user is already registered or validation failed");
         }
       } catch (err) {
         console.log("Error registering user:", err);
       } finally {
         setSaving(false);
       }
+    } else {
+      console.error("ProfileSetup: Missing backendActor or identity");
     }
   };
 
@@ -87,16 +147,60 @@ function ProfileSetup({ onComplete }: Props) {
 
         <div>
           <Label htmlFor="profilePicture" className="text-blue-900 font-medium">
-            Profile Picture URL (Optional)
+            Profile Picture (Optional)
           </Label>
-          <Input
-            type="url"
-            id="profilePicture"
-            value={profilePicture}
-            onChange={(e) => setProfilePicture(e.target.value)}
-            className="mt-1 bg-blue-50 border-gray-300 focus:border-blue-500 text-blue-900"
-            placeholder="https://example.com/avatar.jpg"
-          />
+          <div className="mt-2 space-y-3">
+            {/* Image Preview */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-blue-100 border-2 border-blue-300 flex items-center justify-center overflow-hidden">
+                  {imagePreview ? (
+                    <img 
+                      src={imagePreview} 
+                      alt="Profile preview" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-blue-400" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUploadClick}
+                  className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1.5 rounded-full hover:bg-blue-600 transition-colors"
+                >
+                  <Camera className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Upload Button */}
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUploadClick}
+                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {imagePreview ? "Change Picture" : "Upload Picture"}
+              </Button>
+            </div>
+            
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            
+            {/* File Info */}
+            <p className="text-xs text-blue-600 text-center">
+              Supported formats: JPG, PNG, GIF (Max 5MB)
+            </p>
+          </div>
         </div>
 
         <Button

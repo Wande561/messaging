@@ -6,8 +6,9 @@
         "strictPropertyInitialization": false,
         "allowSyntheticDefaultImports": true,
         "resolveJsonModule": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "allowJs": true,
-        "outDir": "HACK_BECAUSE_OF_ALLOW_JS"
+        "outDir": "HACK_BECAUSE_OF_ALLOW_JS",
+        "types": []
     }
 }

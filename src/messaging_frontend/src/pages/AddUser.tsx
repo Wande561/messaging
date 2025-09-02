@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+//import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Search, UserPlus, MessageCircle, Users } from "lucide-react";
 import { useAuth } from "@/context/AppContext";
 import { Principal } from "@dfinity/principal";
+import { useState } from "react";
 
 interface AddUserPageProps {
   onBack: () => void;
@@ -102,7 +103,7 @@ export function AddUserPage({ onBack, onStartConversation }: AddUserPageProps) {
                   <Input
                     id="search"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                     placeholder="Enter username to search..."
                     className="flex-1 border-blue-200 focus:border-blue-500 text-blue-900"
                   />

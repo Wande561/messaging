@@ -33,6 +33,7 @@ interface ContextType {
   sendMessage: (receiver: any, text: string) => Promise<boolean>;
   getMessages: (other: any) => Promise<any[]>;
   getUser: (principal: any) => Promise<any>;
+  getUserConversations: () => Promise<any[]>;
 }
 
 const initialContext: ContextType = {
@@ -45,6 +46,7 @@ const initialContext: ContextType = {
   sendMessage: async () => false,
   getMessages: async () => [],
   getUser: async () => null,
+  getUserConversations: async () => [],
 };
 
 const AuthContext = createContext<ContextType>(initialContext);
@@ -146,9 +148,9 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getMessages = async (other: any) => {
-    if (!backendActor) return [];
+    if (!backendActor || !identity) return [];
     try {
-      return await backendActor.getUserMessages(other);
+      return await backendActor.getMessages(other, identity.getPrincipal());
     } catch (err) {
       console.error("getMessages error:", err);
       return [];
@@ -156,12 +158,27 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getUser = async (principal: any) => {
-    if (!backendActor) return null;
+    if (!backendActor) {
+      return null;
+    }
     try {
-      return await backendActor.getUser(principal);
+      const result = await backendActor.getUser(principal);
+      // Handle Motoko optional type - returns [] | [PublicUser]
+      return result.length > 0 ? result[0] : null;
     } catch (err) {
       console.error("getUser error:", err);
       return null;
+    }
+  };
+
+  const getUserConversations = async () => {
+    if (!backendActor || !identity) return [];
+    try {
+      const conversations = await backendActor.getUserMessages(identity.getPrincipal());
+      return conversations;
+    } catch (err) {
+      console.error("getUserConversations error:", err);
+      return [];
     }
   };
 
@@ -175,6 +192,7 @@ export const useAuthClient = (options = defaultOptions) => {
     sendMessage,
     getMessages,
     getUser,
+    getUserConversations,
   };
 };
 

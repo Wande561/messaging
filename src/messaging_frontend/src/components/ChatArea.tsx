@@ -22,13 +22,15 @@ interface ChatAreaProps {
   conversationName?: string;
   conversationAvatar?: string;
   isOnline?: boolean;
+  onMessageSent?: () => void;
 }
 
 export function ChatArea({ 
   conversationId,
-  conversationName = "Select a conversation",
+  conversationName = "Select Conversation", 
   conversationAvatar = "/placeholder.svg",
-  isOnline = true 
+  isOnline = true,
+  onMessageSent 
 }: ChatAreaProps) {
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -60,7 +62,7 @@ export function ChatArea({
             hour: '2-digit', 
             minute: '2-digit' 
           }),
-          isOwn: msg.sender.toText() === identity.getPrincipal().toText(),
+          isOwn: msg.sender && identity ? msg.sender.toText() === identity.getPrincipal().toText() : false,
           sender: msg.sender,
           receiver: msg.receiver,
         }));
@@ -97,6 +99,10 @@ export function ChatArea({
         setNewMessage("");
         // Reload messages to show the new message
         await loadMessages();
+        // Notify parent to refresh conversations
+        if (onMessageSent) {
+          onMessageSent();
+        }
       } else {
         console.error("Failed to send message");
       }
@@ -120,23 +126,18 @@ export function ChatArea({
       <div className="p-4 border-card-border bg-blue-300 backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-10 w-10 ">
-                <AvatarImage src={conversationAvatar} />
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {conversationName.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              {isOnline && (
-                <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success rounded-full border-2 border-card"></div>
-              )}
-            </div>
+            <Avatar className="h-10 w-10 ">
+              <AvatarImage src={conversationAvatar} />
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {conversationName.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
             <div>
               <h3 className="font-semibold text-navy text-foreground">
-                {userInfo?.username || conversationName}
+                {conversationId ? (userInfo?.username || conversationName) : "Select Conversation"}
               </h3>
               <p className="text-sm text-white text-muted-foreground">
-                {userInfo?.online ? "Active now" : "Last seen recently"}
+                {conversationId && userInfo?.online ? "Active now" : conversationId ? "Last seen recently" : "Choose a conversation to start messaging"}
               </p>
             </div>
           </div>
