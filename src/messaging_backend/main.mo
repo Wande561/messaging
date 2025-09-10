@@ -1,49 +1,41 @@
 import Time "mo:base/Time";
-import TrieMap "mo:base/TrieMap";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Prim "mo:prim";
+import Result "mo:base/Result";
+import Map "mo:base/HashMap";
+
+import StateManager "statemanager";
+import Types "types";
 
 persistent actor MessagingApp {
 
-  type User = {
-    username : Text;
-    profilePicture : Text;
-    status : Text;
-    createdAt : Time.Time;
-    lastSeen : Time.Time;
-  };
+  type User = Types.User;
+  type Message = Types.Message;
+  type PublicUser = Types.PublicUser;
 
-  type PublicUser = {
-    username : Text;
-    profilePicture : Text;
-    status : Text;
-    createdAt : Time.Time;
-    lastSeen : Time.Time;
-    online : Bool;
-  };
-
-  type Message = {
-    sender : Principal;
-    receiver : Principal;
-    text : Text;
-    timestamp : Time.Time;
-  };
-
-  var usersEntries : [(Principal, User)] = [];
+  var usersEntries : [(Text, User)] = [];
   var messagesEntries : [(Text, [Message])] = [];
 
-  transient var users = TrieMap.fromEntries<Principal, User>(usersEntries.vals(), Principal.equal, Principal.hash);
-  transient var messages = TrieMap.fromEntries<Text, [Message]>(messagesEntries.vals(), Text.equal, Text.hash);
+  transient var usersState = StateManager.users_new();
+  transient var chatMessages = Map.HashMap<Text, [Message]>(0, Text.equal, Text.hash);
 
   system func preupgrade() {
-    usersEntries := Iter.toArray(users.entries());
-    messagesEntries := Iter.toArray(messages.entries());
+    usersEntries := Iter.toArray(usersState.users.entries());
+    messagesEntries := Iter.toArray(chatMessages.entries());
   };
 
   system func postupgrade() {
+
+    for ((id, user) in usersEntries.vals()) {
+      usersState.users.put(id, user);
+    };
+    for ((chatId, msgs) in messagesEntries.vals()) {
+      chatMessages.put(chatId, msgs);
+    };
+
     usersEntries := [];
     messagesEntries := [];
   };
@@ -57,9 +49,11 @@ persistent actor MessagingApp {
   };
 
   func touchUser(who : Principal) {
-    switch (users.get(who)) {
+    let userId = Principal.toText(who);
+    switch (usersState.users.get(userId)) {
       case (?u) {
-        users.put(who, { 
+        usersState.users.put(userId, { 
+          version = u.version;
           username = u.username;
           profilePicture = u.profilePicture;
           status = u.status;
@@ -73,8 +67,9 @@ persistent actor MessagingApp {
 
   func makePublicUser(u : User) : PublicUser {
     let now = Time.now();
-    let online = (now - u.lastSeen) < 120_000_000_000;
+    let online = (now - u.lastSeen) < 120_000_000_000; 
     {
+      version = u.version;
       username = u.username;
       profilePicture = u.profilePicture;
       status = u.status;
@@ -84,35 +79,45 @@ persistent actor MessagingApp {
     }
   };
 
-  public shared func registerUser(username : Text, caller : Principal) : async Bool {
-    let who = caller;
-    if (users.get(who) != null) {
-      return false;
+  public shared(msg) func registerUser(username : Text) : async Result.Result<Text, Text> {
+    let caller = msg.caller;
+    let userId = Principal.toText(caller);
+
+    switch (usersState.users.get(userId)) {
+      case (?_) { #err("User already registered") };
+      case null {
+        let now = Time.now();
+        let newUser : User = {
+          version = 1;
+          username = username; 
+          profilePicture = ""; 
+          status = "Available"; 
+          createdAt = now; 
+          lastSeen = now 
+        };
+        usersState.users.put(userId, newUser);
+        #ok(userId)
+      };
     };
-    let now = Time.now();
-    users.put(who, { 
-      username = username; 
-      profilePicture = ""; 
-      status = "Available"; 
-      createdAt = now; 
-      lastSeen = now 
-    });
-    return true;
   };
 
-  public shared func updateProfile(newUsername : Text, newProfilePicture : Text, newStatus : Text, caller : Principal) : async Bool {
-    let who = caller;
-    switch (users.get(who)) {
-      case null { return false };
+  public shared(msg) func updateProfile(newUsername : Text, newProfilePicture : Text, newStatus : Text) : async Result.Result<(), Text> {
+    let caller = msg.caller;
+    let userId = Principal.toText(caller);
+    
+    switch (usersState.users.get(userId)) {
+      case null { #err("User not found") };
       case (?user) {
-        users.put(who, { 
+        let updatedUser : User = {
+          version = user.version;
           username = newUsername; 
           profilePicture = newProfilePicture; 
           status = newStatus; 
           createdAt = user.createdAt; 
           lastSeen = Time.now() 
-        });
-        return true;
+        };
+        usersState.users.put(userId, updatedUser);
+        #ok(())
       };
     };
   };
@@ -120,48 +125,58 @@ persistent actor MessagingApp {
   public query func searchUsers(keyword : Text) : async [(Principal, PublicUser)] {
     let lowerKey = Text.map(keyword, Prim.charToLower);
     var results : [(Principal, PublicUser)] = [];
-    for ((p, u) in users.entries()) {
-      let lowerName = Text.map(u.username, Prim.charToLower);
+    
+    for ((userId, user) in usersState.users.entries()) {
+      let lowerName = Text.map(user.username, Prim.charToLower);
       if (Text.contains(lowerName, #text lowerKey)) {
-        results := Array.append(results, [(p, makePublicUser(u))]);
+        let principal = Principal.fromText(userId);
+        results := Array.append(results, [(principal, makePublicUser(user))]);
       };
     };
     results
   };
 
-  public shared func sendMessage(receiver : Principal, text : Text, caller : Principal) : async Bool {
-    let sender = caller;
-    if (users.get(sender) == null or users.get(receiver) == null) {
-      return false;
+  public shared(msg) func sendMessage(receiver : Principal, text : Text) : async Result.Result<(), Text> {
+    let sender = msg.caller;
+    let senderId = Principal.toText(sender);
+    let receiverId = Principal.toText(receiver);
+
+    switch (usersState.users.get(senderId), usersState.users.get(receiverId)) {
+      case (?_, ?_) {
+        touchUser(sender);
+        let chatId = getChatId(sender, receiver);
+        let newMsg : Message = {
+          version = 1;
+          sender = sender;
+          receiver = receiver;
+          text = text;
+          timestamp = Time.now();
+        };
+        
+        let oldMsgs = switch (chatMessages.get(chatId)) {
+          case null { [] };
+          case (?arr) { arr };
+        };
+        chatMessages.put(chatId, Array.append(oldMsgs, [newMsg]));
+        #ok(())
+      };
+      case (null, _) { #err("Sender not found") };
+      case (_, null) { #err("Receiver not found") };
     };
-    touchUser(sender);
-    let chatId = getChatId(sender, receiver);
-    let newMsg : Message = {
-      sender = sender;
-      receiver = receiver;
-      text = text;
-      timestamp = Time.now();
-    };
-    let oldMsgs = switch (messages.get(chatId)) {
-      case (null) { [] };
-      case (?arr) { arr };
-    };
-    messages.put(chatId, Array.append(oldMsgs, [newMsg]));
-    return true;
   };
 
-  public shared query func getMessages(other : Principal, caller : Principal) : async [Message] {
-    let who = caller;
-    let chatId = getChatId(who, other);
-    switch (messages.get(chatId)) {
-      case (null) { [] };
+  public query func getMessages(caller : Principal, other : Principal) : async [Message] {
+    let chatId = getChatId(caller, other);
+    switch (chatMessages.get(chatId)) {
+      case null { [] };
       case (?arr) { arr };
     }
   };
 
   public query func getUserMessages(caller : Principal) : async [(Principal, [Message])] {
     var userMessages : [(Principal, [Message])] = [];
-    for ((chatId, msgs) in messages.entries()) {
+    
+    for ((chatId, msgs) in chatMessages.entries()) {
       let partsArr = Iter.toArray(Text.split(chatId, #text "|"));
       if (Array.size(partsArr) == 2) {
         let p1 = Principal.fromText(partsArr[0]);
@@ -176,10 +191,17 @@ persistent actor MessagingApp {
   };
 
   public query func getUser(p : Principal) : async ?PublicUser {
-    switch (users.get(p)) {
+    let userId = Principal.toText(p);
+    switch (usersState.users.get(userId)) {
       case null { null };
       case (?u) { ?makePublicUser(u) };
     }
   };
-  
+
+  public query func getStats() : async { userCount : Nat; messageChats : Nat } {
+    {
+      userCount = usersState.users.size();
+      messageChats = chatMessages.size();
+    }
+  };
 }

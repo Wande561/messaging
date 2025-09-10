@@ -23,7 +23,6 @@ function ProfileSetup({ onComplete }: Props) {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Check file size (limit to 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert("File size must be less than 5MB");
         return;
@@ -74,25 +73,27 @@ function ProfileSetup({ onComplete }: Props) {
         }
         
         console.log("ProfileSetup: Calling registerUser...");
-        const result = await backendActor.registerUser(username, principal);
+        const result = await backendActor.registerUser(username);
         
         console.log("ProfileSetup: registerUser result:", result);
         
-        if (result) {
+        if ('ok' in result) {
           console.log("ProfileSetup: Calling updateProfile...");
           
-          await backendActor.updateProfile(
+          const updateResult = await backendActor.updateProfile(
             username,
             profilePicture,
-            status || "Available",
-            principal
+            status || "Available"
           );
           
-          console.log("ProfileSetup: Profile updated successfully, calling onComplete...");
-          onComplete(); // refresh users + current user
+          if ('ok' in updateResult) {
+            console.log("ProfileSetup: Profile updated successfully, calling onComplete...");
+            onComplete(); // refresh users + current user
+          } else {
+            console.error("ProfileSetup: updateProfile failed:", updateResult);
+          }
         } else {
-          console.error("ProfileSetup: registerUser returned false");
-          console.error("ProfileSetup: This might indicate the user is already registered or validation failed");
+          console.error("ProfileSetup: registerUser failed:", result);
         }
       } catch (err) {
         console.log("Error registering user:", err);

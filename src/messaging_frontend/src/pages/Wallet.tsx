@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Textarea } from "../components/ui/textarea";
 import { ArrowLeft, Wallet, Send, History, RefreshCw, Copy, ExternalLink, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "../context/WalletContext";
 
 interface WalletPageProps {
   onBack: () => void;

@@ -28,6 +28,7 @@ interface SearchResult {
 interface ConversationSidebarProps {
   selectedConversationId?: string | null;
   onConversationSelect: (id: string) => void;
+  onConversationsLoaded?: (conversations: Conversation[]) => void;
   onSettingsClick?: () => void;
   onAddUserClick?: () => void;
   onWalletClick?: () => void;
@@ -38,8 +39,8 @@ export interface ConversationSidebarRef {
 }
 
 export const ConversationSidebar = forwardRef<ConversationSidebarRef, ConversationSidebarProps>(
-  ({ selectedConversationId, onConversationSelect, onSettingsClick, onAddUserClick, onWalletClick }, ref) => {
-  const { logout, searchUsers, getUserConversations, getUser, identity } = useAuth();
+  ({ selectedConversationId, onConversationSelect, onConversationsLoaded, onSettingsClick, onAddUserClick, onWalletClick }, ref) => {
+  const { logout, searchUsers, getUserConversations, getUser, identity, backendActor } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -47,30 +48,32 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
-  // Expose refresh method to parent
   useImperativeHandle(ref, () => ({
     refreshConversations: loadConversations
   }));
 
-  // Load conversations when component mounts or identity changes
   useEffect(() => {
-    if (identity) {
+    if (identity && backendActor) {
       loadConversations();
     }
-  }, [identity]);
+  }, [identity, backendActor]);
 
   const loadConversations = async () => {
-    if (!identity) return;
+    if (!identity) {
+      console.log("No identity found, cannot load conversations.");
+      return;
+    }
     
     setIsLoadingConversations(true);
     try {
+   
       const userConversations = await getUserConversations();
       
       if (userConversations && userConversations.length > 0) {
-        // Format conversations for the UI
+
         const formattedConversations: Conversation[] = await Promise.all(
           userConversations.map(async ([otherPrincipal, messages]: [Principal, any[]]) => {
-            // Get user info for the other participant
+
             const userInfo = await getUser(otherPrincipal);
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
             
@@ -84,13 +87,16 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
                     minute: '2-digit' 
                   })
                 : "",
-              unreadCount: 0, // TODO: Implement unread count logic
               avatar: userInfo?.profilePicture || "/placeholder.svg"
             };
           })
         );
         
         setConversations(formattedConversations);
+        
+        if (onConversationsLoaded) {
+          onConversationsLoaded(formattedConversations);
+        }
       }
     } catch (error) {
       console.error("Error loading conversations:", error);
@@ -135,17 +141,15 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
   };
 
   const handleStartConversation = (result: SearchResult) => {
-    // Convert principal to string to use as conversation ID
     const conversationId = result.principal.toText();
     onConversationSelect(conversationId);
     setSearchQuery("");
     setShowSearchResults(false);
     setSearchResults([]);
-    
-    // Reload conversations to include the new one
+
     setTimeout(() => {
       loadConversations();
-    }, 1000); // Small delay to allow any message sending to complete
+    }, 1000); 
   };
 
   return (

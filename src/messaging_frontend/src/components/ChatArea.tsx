@@ -1,7 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Send, MoreVertical, Phone, Video, Search } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import { Send, MoreVertical, Search, RefreshCw, Trash2, Archive, Bell, BellOff, UserX, ChevronUp, ChevronDown, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AppContext";
 import { Principal } from "@dfinity/principal";
@@ -35,10 +42,15 @@ export function ChatArea({
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [userInfo, setUserInfo] = useState<any>(null);
+  const [isNotificationMuted, setIsNotificationMuted] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<number[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const { sendMessage, getMessages, getUser, identity } = useAuth();
 
-  // Load messages when conversation changes
   useEffect(() => {
     if (conversationId && identity) {
       loadMessages();
@@ -85,6 +97,126 @@ export function ChatArea({
     } catch (error) {
       console.error("Error loading user info:", error);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!conversationId || !identity) return;
+    
+    setIsRefreshing(true);
+    try {
+      // Reload both messages and user info
+      await Promise.all([loadMessages(), loadUserInfo()]);
+    } catch (error) {
+      console.error("Error refreshing chat:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleClearChat = () => {
+    if (window.confirm("Are you sure you want to clear this chat? This action cannot be undone.")) {
+      setMessages([]);
+      // You could also call a backend function here to clear messages from the database
+      console.log("Chat cleared for conversation:", conversationId);
+    }
+  };
+
+  const handleArchiveChat = () => {
+    console.log("Archive chat for conversation:", conversationId);
+    // Implement archive functionality
+    alert("Chat archived (feature coming soon)");
+  };
+
+  const handleBlockUser = () => {
+    if (window.confirm(`Are you sure you want to block ${userInfo?.username || conversationName}?`)) {
+      console.log("Block user for conversation:", conversationId);
+      // Implement block functionality
+      alert("User blocked (feature coming soon)");
+    }
+  };
+
+  const handleToggleNotifications = () => {
+    setIsNotificationMuted(!isNotificationMuted);
+    console.log(`Notifications ${!isNotificationMuted ? 'muted' : 'unmuted'} for:`, conversationId);
+  };
+
+  const handleSearchToggle = () => {
+    setIsSearchOpen(!isSearchOpen);
+    if (isSearchOpen) {
+      // Clear search when closing
+      setSearchQuery("");
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+    }
+  };
+
+  const handleSearchMessages = (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+      return;
+    }
+
+    // Search through messages for the query
+    const results: number[] = [];
+    messages.forEach((message, index) => {
+      if (message.content.toLowerCase().includes(query.toLowerCase())) {
+        results.push(index);
+      }
+    });
+
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+    
+    // Scroll to first result if found
+    if (results.length > 0) {
+      scrollToMessage(results[0]);
+    }
+  };
+
+  const handleSearchNext = () => {
+    if (searchResults.length === 0) return;
+    
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    scrollToMessage(searchResults[nextIndex]);
+  };
+
+  const handleSearchPrevious = () => {
+    if (searchResults.length === 0) return;
+    
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    scrollToMessage(searchResults[prevIndex]);
+  };
+
+  const scrollToMessage = (messageIndex: number) => {
+    const messageElement = document.getElementById(`message-${messageIndex}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Highlight the message briefly
+      messageElement.classList.add('bg-yellow-200');
+      setTimeout(() => {
+        messageElement.classList.remove('bg-yellow-200');
+      }, 2000);
+    }
+  };
+
+  const highlightSearchText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.split(regex).map((part, index) => 
+      regex.test(part) ? (
+        <mark key={index} className="bg-yellow-300 px-1 rounded">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
   };
 
   const handleSendMessage = async () => {
@@ -143,21 +275,113 @@ export function ChatArea({
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground">
-              <Phone className="h-4 text-navy w-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Refresh messages"
+            >
+              <RefreshCw className={`h-4 text-navy w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground">
-              <Video className="h-4 text-navy w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={`h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground ${isSearchOpen ? 'bg-blue-200' : ''}`}
+              onClick={handleSearchToggle}
+              title="Search messages"
+            >
               <Search className="h-4 text-navy w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground">
-              <MoreVertical className="h-4 text-navy w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-blue-200 hover:text-foreground">
+                  <MoreVertical className="h-4 text-navy w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleToggleNotifications}>
+                  {isNotificationMuted ? (
+                    <>
+                      <Bell className="mr-2 h-4 w-4" />
+                      Unmute notifications
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="mr-2 h-4 w-4" />
+                      Mute notifications
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleArchiveChat}>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive chat
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleClearChat} className="text-red-600 focus:text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear chat
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBlockUser} className="text-red-600 focus:text-red-600">
+                  <UserX className="mr-2 h-4 w-4" />
+                  Block user
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
+
+      {/* Search Interface */}
+      {isSearchOpen && (
+        <div className="p-3 border-b border-card-border bg-gray-50">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 relative">
+              <Input
+                placeholder="Search messages..."
+                value={searchQuery}
+                onChange={(e) => handleSearchMessages(e.target.value)}
+                className="pr-20"
+                autoFocus
+              />
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1 text-sm text-gray-500">
+                {searchResults.length > 0 && (
+                  <span>{currentSearchIndex + 1} of {searchResults.length}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSearchPrevious}
+                disabled={searchResults.length === 0}
+                title="Previous result"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSearchNext}
+                disabled={searchResults.length === 0}
+                title="Next result"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSearchToggle}
+                title="Close search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -174,10 +398,11 @@ export function ChatArea({
             <p>No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          messages.map((message) => (
+          messages.map((message, index) => (
             <div
               key={message.id}
-              className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}
+              id={`message-${index}`}
+              className={`flex ${message.isOwn ? "justify-end" : "justify-start"} transition-colors duration-200`}
             >
               <div className={`flex gap-3 max-w-[70%] ${message.isOwn ? "flex-row-reverse" : "flex-row"}`}>
                 {!message.isOwn && (
@@ -197,7 +422,9 @@ export function ChatArea({
                         : "bg-gray-200 text-navy " // received: lighter grey, navy text
                     }`}
                   >
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-sm leading-relaxed">
+                      {highlightSearchText(message.content, searchQuery)}
+                    </p>
                   </div>
                   
                   <span className="text-xs text-muted-foreground mt-1 px-2">

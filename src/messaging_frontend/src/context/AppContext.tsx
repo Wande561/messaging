@@ -18,17 +18,23 @@ import { _SERVICE } from "../../../declarations/messaging_backend/messaging_back
 let network = "local";
 if (typeof process !== "undefined" && process.env && process.env.DFX_NETWORK) {
   network = process.env.DFX_NETWORK;
+} else if (typeof window !== "undefined" && window.location.host.includes("localhost")) {
+  network = "local";
+} else if (typeof window !== "undefined" && window.location.host.includes("icp0.io")) {
+  network = "ic";
 }
 
 const localhost = "http://localhost:4943";
-const host = "https://icp0.io";
+const host = network === "local" ? localhost : "https://icp0.io";
 
 interface ContextType {
   isAuthenticated: boolean | null;
   backendActor: ActorSubclass<_SERVICE> | null;
   identity: Identity | null;
+  currentUser: any | null;
   login: () => void;
   logout: () => void;
+  registerUser: (username: string) => Promise<any>;
   searchUsers: (keyword: string) => Promise<any>;
   sendMessage: (receiver: any, text: string) => Promise<boolean>;
   getMessages: (other: any) => Promise<any[]>;
@@ -40,8 +46,10 @@ const initialContext: ContextType = {
   identity: null,
   backendActor: null,
   isAuthenticated: false,
+  currentUser: null,
   login: (): void => {},
   logout: (): void => {},
+  registerUser: async () => null,
   searchUsers: async () => [],
   sendMessage: async () => false,
   getMessages: async () => [],
@@ -76,12 +84,27 @@ export const useAuthClient = (options = defaultOptions) => {
   const [backendActor, setBackendActor] =
     useState<ActorSubclass<_SERVICE> | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  // Helper function to convert BigInt values to strings for JSON serialization
+  const serializeUser = (user: any) => {
+    return JSON.parse(JSON.stringify(user, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ));
+  };
 
   useEffect(() => {
-    AuthClient.create(options.createOptions).then(async (client) => {
-      updateClient(client);
-    });
+    initializeAuth();
   }, []);
+
+  const initializeAuth = async () => {
+    try {
+      const client = await AuthClient.create(options.createOptions);
+      await updateClient(client);
+    } catch (error) {
+      console.error("Auth initialization failed:", error);
+    }
+  };
 
   const login = () => {
     authClient?.login({
@@ -93,39 +116,141 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   async function updateClient(client: AuthClient) {
-    const isAuthenticated = await client.isAuthenticated();
-    setIsAuthenticated(isAuthenticated);
+    try {
+      const isAuthenticated = await client.isAuthenticated();
+      setIsAuthenticated(isAuthenticated);
+      setAuthClient(client);
 
-    setAuthClient(client);
+      const _identity = client.getIdentity();
+      setIdentity(_identity);
 
-    const _identity = client.getIdentity();
-    setIdentity(_identity);
+      let agent = new HttpAgent({
+        host: host,
+        identity: _identity,
+      });
 
-    let agent = new HttpAgent({
-      host: network === "local" ? localhost : host,
-      identity: _identity,
-    });
-
-    if (network === "local") {
-      agent.fetchRootKey();
-    }
-
-    const _backendActor: ActorSubclass<_SERVICE> = Actor.createActor(
-      idlFactory,
-      {
-        agent,
-        canisterId: canisterId,
+      // For local development, fetch root key to bypass certificate verification
+      if (network === "local") {
+        try {
+          await agent.fetchRootKey();
+          console.log("Successfully fetched root key for local development");
+        } catch (error) {
+          console.error("Failed to fetch root key:", error);
+          throw new Error("Cannot connect to local replica. Make sure dfx is running.");
+        }
       }
-    );
-    setBackendActor(_backendActor);
+
+      const _backendActor: ActorSubclass<_SERVICE> = Actor.createActor(
+        idlFactory,
+        {
+          agent,
+          canisterId: canisterId,
+        }
+      );
+      setBackendActor(_backendActor);
+
+      // Handle session restoration for authenticated users
+      if (isAuthenticated) {
+        await restoreUserSession(_backendActor, _identity);
+      }
+    } catch (error) {
+      console.error("Failed to update client:", error);
+    }
+  }
+
+  // Comprehensive session restoration function
+  const restoreUserSession = async (actor: ActorSubclass<_SERVICE>, identity: Identity) => {
+    try {
+      const principal = identity.getPrincipal();
+      
+      // Try to restore from localStorage first
+      const storedUser = localStorage.getItem('messagingAppUser');
+      let userFromStorage = null;
+      
+      if (storedUser) {
+        try {
+          userFromStorage = JSON.parse(storedUser);
+          console.log("Found stored user data, validating with backend...");
+        } catch (error) {
+          console.warn("Invalid stored user data, clearing localStorage");
+          localStorage.removeItem('messagingAppUser');
+        }
+      }
+
+      // Always validate with backend to ensure user still exists
+      const userData = await actor.getUser(principal);
+      
+      if (userData && userData.length > 0) {
+        const user = { 
+          principal: principal.toString(),
+          ...userData[0] 
+        };
+        const serializedUser = serializeUser(user);
+        
+        // Update current user state
+        setCurrentUser(serializedUser);
+        
+        // Update localStorage with fresh data
+        localStorage.setItem('messagingAppUser', JSON.stringify(serializedUser));
+        
+        console.log("User session restored successfully:", serializedUser.username);
+        
+        // After user is restored, we can restore conversation state
+        // This will be handled by the Index component when it detects currentUser is set
+        
+      } else if (userFromStorage) {
+        // User no longer exists in backend, clear localStorage
+        console.warn("User no longer exists in backend, clearing stored data");
+        localStorage.removeItem('messagingAppUser');
+        localStorage.removeItem('selectedConversationId');
+        setCurrentUser(null);
+      }
+    } catch (error) {
+      console.error("Failed to restore user session:", error);
+      // Clear potentially corrupted data
+      localStorage.removeItem('messagingAppUser');
+      localStorage.removeItem('selectedConversationId');
+    }
   }
 
   async function logout() {
-    await authClient?.logout();
-    if (authClient) {
-      await updateClient(authClient);
+    try {
+      await authClient?.logout();
+      setCurrentUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('selectedConversationId');
+        localStorage.removeItem('messagingAppUser');
+      }
+      if (authClient) {
+        await updateClient(authClient);
+      }
+    } catch (error) {
+      console.error("Logout failed:", error);
     }
   }
+
+  const registerUser = async (username: string) => {
+    if (!backendActor || !identity) return null;
+    try {
+      const result = await backendActor.registerUser(username);
+      if ('ok' in result) {
+        const user = {
+          principal: identity.getPrincipal().toString(),
+          username: username,
+          profilePicture: "",
+          status: status || "Available",
+        };
+        const serializedUser = serializeUser(user);
+        setCurrentUser(serializedUser);
+        localStorage.setItem('messagingAppUser', JSON.stringify(serializedUser));
+        return result;
+      }
+      return result;
+    } catch (err) {
+      console.error("registerUser error:", err);
+      return { err: "Registration failed" };
+    }
+  };
 
   const searchUsers = async (keyword: string) => {
     if (!backendActor) return [];
@@ -140,7 +265,8 @@ export const useAuthClient = (options = defaultOptions) => {
   const sendMessage = async (receiver: any, text: string) => {
     if (!backendActor || !identity) return false;
     try {
-      return await backendActor.sendMessage(receiver, text, identity.getPrincipal());
+      const result = await backendActor.sendMessage(receiver, text);
+      return 'ok' in result;
     } catch (err) {
       console.error("sendMessage error:", err);
       return false;
@@ -148,9 +274,10 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getMessages = async (other: any) => {
+    console.error("getUser error:");
     if (!backendActor || !identity) return [];
     try {
-      return await backendActor.getMessages(other, identity.getPrincipal());
+      return await backendActor.getMessages(identity.getPrincipal(), other);
     } catch (err) {
       console.error("getMessages error:", err);
       return [];
@@ -158,12 +285,9 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getUser = async (principal: any) => {
-    if (!backendActor) {
-      return null;
-    }
+    if (!backendActor) return null;
     try {
       const result = await backendActor.getUser(principal);
-      // Handle Motoko optional type - returns [] | [PublicUser]
       return result.length > 0 ? result[0] : null;
     } catch (err) {
       console.error("getUser error:", err);
@@ -172,7 +296,9 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getUserConversations = async () => {
-    if (!backendActor || !identity) return [];
+    if (!backendActor || !identity) {
+      return [];
+    }
     try {
       const conversations = await backendActor.getUserMessages(identity.getPrincipal());
       return conversations;
@@ -188,6 +314,8 @@ export const useAuthClient = (options = defaultOptions) => {
     login,
     logout,
     identity,
+    currentUser,
+    registerUser,
     searchUsers,
     sendMessage,
     getMessages,
