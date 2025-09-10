@@ -88,8 +88,11 @@ export function ChatArea({
   };
 
   const loadUserInfo = async () => {
-    if (!conversationId) return;
-    
+    if (!conversationId){
+      console.log("Cannot load user info: No conversationId");
+      return;
+    }
+
     try {
       const otherPrincipal = Principal.fromText(conversationId);
       const userData = await getUser(otherPrincipal);
@@ -104,7 +107,6 @@ export function ChatArea({
     
     setIsRefreshing(true);
     try {
-      // Reload both messages and user info
       await Promise.all([loadMessages(), loadUserInfo()]);
     } catch (error) {
       console.error("Error refreshing chat:", error);
@@ -116,21 +118,18 @@ export function ChatArea({
   const handleClearChat = () => {
     if (window.confirm("Are you sure you want to clear this chat? This action cannot be undone.")) {
       setMessages([]);
-      // You could also call a backend function here to clear messages from the database
       console.log("Chat cleared for conversation:", conversationId);
     }
   };
 
   const handleArchiveChat = () => {
     console.log("Archive chat for conversation:", conversationId);
-    // Implement archive functionality
     alert("Chat archived (feature coming soon)");
   };
 
   const handleBlockUser = () => {
     if (window.confirm(`Are you sure you want to block ${userInfo?.username || conversationName}?`)) {
       console.log("Block user for conversation:", conversationId);
-      // Implement block functionality
       alert("User blocked (feature coming soon)");
     }
   };
@@ -143,7 +142,6 @@ export function ChatArea({
   const handleSearchToggle = () => {
     setIsSearchOpen(!isSearchOpen);
     if (isSearchOpen) {
-      // Clear search when closing
       setSearchQuery("");
       setSearchResults([]);
       setCurrentSearchIndex(-1);
@@ -159,7 +157,6 @@ export function ChatArea({
       return;
     }
 
-    // Search through messages for the query
     const results: number[] = [];
     messages.forEach((message, index) => {
       if (message.content.toLowerCase().includes(query.toLowerCase())) {
@@ -169,8 +166,7 @@ export function ChatArea({
 
     setSearchResults(results);
     setCurrentSearchIndex(results.length > 0 ? 0 : -1);
-    
-    // Scroll to first result if found
+
     if (results.length > 0) {
       scrollToMessage(results[0]);
     }
@@ -196,7 +192,7 @@ export function ChatArea({
     const messageElement = document.getElementById(`message-${messageIndex}`);
     if (messageElement) {
       messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Highlight the message briefly
+
       messageElement.classList.add('bg-yellow-200');
       setTimeout(() => {
         messageElement.classList.remove('bg-yellow-200');
@@ -229,9 +225,7 @@ export function ChatArea({
       
       if (success) {
         setNewMessage("");
-        // Reload messages to show the new message
         await loadMessages();
-        // Notify parent to refresh conversations
         if (onMessageSent) {
           onMessageSent();
         }

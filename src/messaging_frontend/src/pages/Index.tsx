@@ -12,21 +12,27 @@ const Index = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'chat' | 'addUser' | 'settings' | 'wallet'>('chat');
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
+  const [manuallySelected, setManuallySelected] = useState(false); 
   const { isAuthenticated, getUser, currentUser } = useAuth();
   const navigate = useNavigate();
   const conversationSidebarRef = useRef<ConversationSidebarRef>(null);
-
   
-
   useEffect(() => {
-    if (currentUser && conversationsLoaded && !selectedConversationId) {
+    if (currentUser && conversationsLoaded && !selectedConversationId && !manuallySelected) {
       const stored = localStorage.getItem('selectedConversationId');
       if (stored) {
-        console.log("🔄 Restoring conversation after user session restored:", stored);
+        console.log("🔄 Restoring conversation from localStorage:", stored, "manuallySelected:", manuallySelected);
         setSelectedConversationId(stored);
       }
+    } else {
+      console.log("❌ Skipping localStorage restoration:", {
+        currentUser: !!currentUser,
+        conversationsLoaded,
+        selectedConversationId,
+        manuallySelected
+      });
     }
-  }, [currentUser, conversationsLoaded, selectedConversationId]);
+  }, [currentUser, conversationsLoaded, selectedConversationId, manuallySelected]);
 
   useEffect(() => {
     if (isAuthenticated === false) {
@@ -36,11 +42,13 @@ const Index = () => {
 
   useEffect(() => {
     const loadUserInfo = async () => {
-      if (selectedConversationId && getUser && conversationsLoaded && currentUser) {
+      if (selectedConversationId && getUser && currentUser) {
+        console.log("🔄 loadUserInfo triggered for:", selectedConversationId, "manuallySelected:", manuallySelected);
         try {
           const userPrincipal = Principal.fromText(selectedConversationId);
           const userData = await getUser(userPrincipal);
           if (userData) {
+            console.log("✅ Loaded user data for:", userData.username, "from conversation:", selectedConversationId);
             setSelectedUser(userData);
           } else {
             console.warn("⚠️ Selected user not found");
@@ -48,7 +56,6 @@ const Index = () => {
           }
         } catch (error) {
           console.error("❌ Error loading user info:", error);
-          // Invalid principal format - clear the stored conversation
           if (error instanceof Error && error.message.includes('Invalid character')) {
             console.warn("⚠️ Invalid principal format, clearing stored conversation");
             setSelectedConversationId(null);
@@ -60,11 +67,11 @@ const Index = () => {
         setSelectedUser(null);
       }
     };
-    
-    if (selectedConversationId && conversationsLoaded && currentUser) {
+
+    if (selectedConversationId && currentUser) {
       loadUserInfo();
     }
-  }, [selectedConversationId, getUser, conversationsLoaded, currentUser]);
+  }, [selectedConversationId, getUser, currentUser, manuallySelected]);
 
   const handleAddUserClick = () => {
     setCurrentView('addUser');
@@ -83,40 +90,52 @@ const Index = () => {
   };
 
   const handleStartConversation = (userId: string) => {
+    setManuallySelected(true); 
     setSelectedConversationId(userId);
-    // Persist to localStorage
     localStorage.setItem('selectedConversationId', userId);
+    console.log("🚀 Starting conversation with:", userId);
     setCurrentView('chat');
+
+    if (conversationSidebarRef.current) {
+      setTimeout(() => {
+        conversationSidebarRef.current?.refreshConversations();
+      }, 500); 
+    }
   };
 
   const handleConversationSelect = (conversationId: string) => {
+    console.log("💬 Manually selecting conversation:", conversationId);
+    setManuallySelected(true); 
     setSelectedConversationId(conversationId);
-    // Persist to localStorage
     localStorage.setItem('selectedConversationId', conversationId);
   };
 
   const handleConversationsLoaded = (conversations: any[]) => {
+    console.log("📋 handleConversationsLoaded called, manuallySelected:", manuallySelected);
     setConversationsLoaded(true);
     
-    // Check if we have a stored conversation to restore
+    if (manuallySelected) {
+      console.log("🚫 Skipping conversation auto-selection due to manual selection");
+      return;
+    }
+
     const storedConversationId = localStorage.getItem('selectedConversationId');
     
     if (storedConversationId && conversations.length > 0) {
-      // Check if the stored conversation exists in the loaded conversations
       const storedConversationExists = conversations.some(conv => conv.id === storedConversationId);
       
       if (storedConversationExists) {
-        // Restore the stored conversation
+        console.log("✅ Restoring stored conversation from conversations list:", storedConversationId);
         setSelectedConversationId(storedConversationId);
       } else {
-        // Stored conversation doesn't exist anymore, clear it and select first available
+        console.log("⚠️ Stored conversation not found, selecting first available");
         localStorage.removeItem('selectedConversationId');
         const firstConversationId = conversations[0].id;
         setSelectedConversationId(firstConversationId);
         localStorage.setItem('selectedConversationId', firstConversationId);
       }
     } else if (!storedConversationId && conversations.length > 0) {
-      // No stored conversation, select the first one
+      console.log("🔄 No stored conversation, selecting first available");
       const firstConversationId = conversations[0].id;
       setSelectedConversationId(firstConversationId);
       localStorage.setItem('selectedConversationId', firstConversationId);
@@ -124,7 +143,6 @@ const Index = () => {
   };
 
   const handleMessageSent = () => {
-    // Refresh conversations when a message is sent
     if (conversationSidebarRef.current) {
       conversationSidebarRef.current.refreshConversations();
     }
@@ -138,7 +156,6 @@ const Index = () => {
     );
   }
 
-  // Render AddUser page
   if (currentView === 'addUser') {
     return (
       <AddUserPage 
@@ -148,7 +165,6 @@ const Index = () => {
     );
   }
 
-  // Render Wallet page
   if (currentView === 'wallet') {
     return (
       <WalletPage 

@@ -207,7 +207,6 @@ export const useAuthClient = (options = defaultOptions) => {
       }
     } catch (error) {
       console.error("Failed to restore user session:", error);
-      // Clear potentially corrupted data
       localStorage.removeItem('messagingAppUser');
       localStorage.removeItem('selectedConversationId');
     }
@@ -274,7 +273,6 @@ export const useAuthClient = (options = defaultOptions) => {
   };
 
   const getMessages = async (other: any) => {
-    console.error("getUser error:");
     if (!backendActor || !identity) return [];
     try {
       return await backendActor.getMessages(identity.getPrincipal(), other);

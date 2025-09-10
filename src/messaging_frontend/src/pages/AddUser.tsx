@@ -57,9 +57,10 @@ export function AddUserPage({ onBack, onStartConversation }: AddUserPageProps) {
   };
 
   const handleStartConversation = (result: SearchResult) => {
+    console.log(result);
     const conversationId = result.principal.toText();
     onStartConversation(conversationId);
-    onBack(); // Go back to main chat view
+    onBack();
   };
 
   return (

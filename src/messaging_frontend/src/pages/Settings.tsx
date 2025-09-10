@@ -61,12 +61,10 @@ function Settings() {
       const result = await backendActor.updateProfile(
         username,
         profilePicture,
-        status,
-        identity.getPrincipal()
+        status
       );
       
       if (result) {
-        // Refresh user data after update
         const updatedUser = await backendActor.getUser(identity.getPrincipal());
         if (updatedUser && updatedUser.length > 0) {
           setCurrentUser(updatedUser[0] ?? null);
