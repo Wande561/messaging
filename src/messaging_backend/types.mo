@@ -25,6 +25,15 @@ module Types {
     online : Bool;
   };
 
+  public type TokenTransfer = {
+    version : Int;
+    from : Principal;
+    to : Principal;
+    amount : Nat;
+    timestamp : Time.Time;
+    description : Text;
+  };
+
   public type Message = {
     version : Int;
     sender : Principal;

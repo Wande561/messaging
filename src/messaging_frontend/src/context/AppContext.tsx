@@ -198,17 +198,25 @@ export const useAuthClient = (options = defaultOptions) => {
         // After user is restored, we can restore conversation state
         // This will be handled by the Index component when it detects currentUser is set
         
-      } else if (userFromStorage) {
-        // User no longer exists in backend, clear localStorage
-        console.warn("User no longer exists in backend, clearing stored data");
-        localStorage.removeItem('messagingAppUser');
-        localStorage.removeItem('selectedConversationId');
+      } else {
+        // User doesn't exist in backend - this is a new user
+        // Clear any stale localStorage data
+        if (userFromStorage) {
+          console.warn("User no longer exists in backend, clearing stored data");
+          localStorage.removeItem('messagingAppUser');
+          localStorage.removeItem('selectedConversationId');
+        }
+        
+        // For new users, we need to trigger registration
+        // This will be handled by the frontend when currentUser is null
         setCurrentUser(null);
+        console.log("New user detected - registration required for rewards");
       }
     } catch (error) {
       console.error("Failed to restore user session:", error);
       localStorage.removeItem('messagingAppUser');
       localStorage.removeItem('selectedConversationId');
+      setCurrentUser(null);
     }
   }
 
@@ -237,11 +245,15 @@ export const useAuthClient = (options = defaultOptions) => {
           principal: identity.getPrincipal().toString(),
           username: username,
           profilePicture: "",
-          status: status || "Available",
+          status: "Available",
         };
         const serializedUser = serializeUser(user);
         setCurrentUser(serializedUser);
         localStorage.setItem('messagingAppUser', JSON.stringify(serializedUser));
+        
+        // Show reward notification
+        console.log("✅ " + result.ok);
+        
         return result;
       }
       return result;

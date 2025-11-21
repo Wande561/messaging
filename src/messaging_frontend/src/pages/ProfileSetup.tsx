@@ -60,8 +60,7 @@ function ProfileSetup({ onComplete }: Props) {
         setSaving(true);
         const principal = identity.getPrincipal();
         console.log("ProfileSetup: User principal:", principal.toText());
-        
-        // First check if user is already registered
+
         console.log("ProfileSetup: Checking if user already exists...");
         const existingUser = await backendActor.getUser(principal);
         console.log("ProfileSetup: Existing user check result:", existingUser);
@@ -88,7 +87,7 @@ function ProfileSetup({ onComplete }: Props) {
           
           if ('ok' in updateResult) {
             console.log("ProfileSetup: Profile updated successfully, calling onComplete...");
-            onComplete(); // refresh users + current user
+            onComplete(); 
           } else {
             console.error("ProfileSetup: updateProfile failed:", updateResult);
           }

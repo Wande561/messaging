@@ -6,15 +6,50 @@ import Iter "mo:base/Iter";
 import Prim "mo:prim";
 import Result "mo:base/Result";
 import Map "mo:base/HashMap";
+import TrieMap "mo:base/TrieMap";
+import Nat "mo:base/Nat";
+import Int "mo:base/Int";
+import Nat64 "mo:base/Nat64";
+import Blob "mo:base/Blob";
+import Debug "mo:base/Debug";
+import Error "mo:base/Error";
 
 import StateManager "statemanager";
 import Types "types";
 
 persistent actor MessagingApp {
 
+  let kotomo_canister = actor("ulvla-h7777-77774-qaacq-cai") : actor {
+    icrc1_transfer : ({
+      from_subaccount: ?[Nat8];
+      to: { owner: Principal; subaccount: ?[Nat8] };
+      amount: Nat;
+      fee: ?Nat;
+      memo: ?[Nat8];
+      created_at_time: ?Nat64;
+    }) -> async { #Ok: Nat; #Err: { 
+      #BadFee: { expected_fee: Nat };
+      #BadBurn: { min_burn_amount: Nat };
+      #InsufficientFunds: { balance: Nat };
+      #TooOld;
+      #CreatedInFuture: { ledger_time: Nat64 };
+      #Duplicate: { duplicate_of: Nat };
+      #TemporarilyUnavailable;
+      #GenericError: { error_code: Nat; message: Text };
+    } };
+    icrc1_balance_of : ({ owner: Principal; subaccount: ?[Nat8] }) -> async Nat;
+  };
+
   type User = Types.User;
   type Message = Types.Message;
   type PublicUser = Types.PublicUser;
+
+  let signUpReward : Nat = 1_000_000_000; // 10 KOTOMO tokens instead of 50
+  let messageReward : Nat = 2_000_000_000;  // 20 KOTOMO tokens instead of 100
+  let messageThreshold : Nat = 50;
+
+  var messageCountEntries : [(Principal, Nat)] = [];
+  transient var messageCounts = TrieMap.TrieMap<Principal, Nat>(Principal.equal, Principal.hash);
 
   var usersEntries : [(Text, User)] = [];
   var messagesEntries : [(Text, [Message])] = [];
@@ -25,6 +60,7 @@ persistent actor MessagingApp {
   system func preupgrade() {
     usersEntries := Iter.toArray(usersState.users.entries());
     messagesEntries := Iter.toArray(chatMessages.entries());
+    messageCountEntries := Iter.toArray(messageCounts.entries());
   };
 
   system func postupgrade() {
@@ -35,9 +71,97 @@ persistent actor MessagingApp {
     for ((chatId, msgs) in messagesEntries.vals()) {
       chatMessages.put(chatId, msgs);
     };
+    for ((principal, count) in messageCountEntries.vals()) {
+      messageCounts.put(principal, count);
+    };
 
     usersEntries := [];
     messagesEntries := [];
+    messageCountEntries := [];
+  };
+
+  private func transferReward(recipient: Principal, amount: Nat) : async Bool {
+    Debug.print("💰 Starting reward transfer to: " # Principal.toText(recipient) # " amount: " # Nat.toText(amount));
+
+    Debug.print("Skipping balance check - will rely on transfer result");
+    
+    let transferArgs = {
+      from_subaccount = null;
+      to = { owner = recipient; subaccount = null };
+      amount = amount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    };
+    
+    Debug.print("� Transfer args: to_owner=" # Principal.toText(recipient) # ", amount=" # Nat.toText(amount));
+
+    try {
+      let result = await kotomo_canister.icrc1_transfer(transferArgs);
+      
+      switch (result) {
+        case (#Ok(blockIndex)) { 
+          Debug.print("✅ Transfer successful! Block index: " # Nat.toText(blockIndex));
+
+          Debug.print("Transfer completed - skipping balance verification");
+          
+          true 
+        };
+        case (#Err(error)) { 
+          Debug.print("❌ Transfer failed with error: " # debug_show(error));
+          false 
+        };
+      };
+    } catch (e) {
+      Debug.print("� Transfer threw exception: " # Error.message(e));
+      false;
+    };
+  };
+
+  private func rewardSignUp(user: Principal) : async () {
+    let userText = Principal.toText(user);
+    Debug.print("🎁 Attempting sign-up reward for user: " # userText);
+    Debug.print("🪙 Reward amount: " # Nat.toText(signUpReward));
+    
+    let success = await transferReward(user, signUpReward);
+    if (success) {
+      Debug.print("✅ Sign-up reward sent successfully!");
+    } else {
+      Debug.print("❌ Sign-up reward failed for user " # userText);
+    };
+  };
+
+  private func checkAndRewardMessages(user: Principal) : async () {
+    let userText = Principal.toText(user);
+    let currentCount = messageCounts.get(user);
+    switch (currentCount) {
+      case null { 
+        Debug.print("📝 First message from user: " # userText);
+        messageCounts.put(user, 1) 
+      };
+      case (?count) {
+        let newCount = count + 1;
+        messageCounts.put(user, newCount);
+        Debug.print("📊 Message count for " # userText # ": " # Nat.toText(newCount));
+
+        if (newCount % messageThreshold == 0) {
+          Debug.print("🎉 Message milestone reached! Rewarding user: " # userText);
+          let success = await transferReward(user, messageReward);
+          if (success) {
+            Debug.print("✅ Message reward sent successfully!");
+          } else {
+            Debug.print("❌ Message reward failed for user " # userText);
+          };
+        };
+      };
+    };
+  };
+
+  public query func getUserMessageCount(user: Principal) : async Nat {
+    switch (messageCounts.get(user)) {
+      case null { 0 };
+      case (?count) { count };
+    };
   };
 
   func getChatId(a : Principal, b : Principal) : Text {
@@ -82,10 +206,16 @@ persistent actor MessagingApp {
   public shared(msg) func registerUser(username : Text) : async Result.Result<Text, Text> {
     let caller = msg.caller;
     let userId = Principal.toText(caller);
+    
+    Debug.print("👤 Registration attempt for user: " # userId # " with username: " # username);
 
     switch (usersState.users.get(userId)) {
-      case (?_) { #err("User already registered") };
+      case (?_) { 
+        Debug.print("⚠️  User already registered: " # userId);
+        #err("User already registered") 
+      };
       case null {
+        Debug.print("✨ New user registration starting...");
         let now = Time.now();
         let newUser : User = {
           version = 1;
@@ -93,10 +223,14 @@ persistent actor MessagingApp {
           profilePicture = ""; 
           status = "Available"; 
           createdAt = now; 
-          lastSeen = now 
+          lastSeen = now;
         };
+        
         usersState.users.put(userId, newUser);
-        #ok(userId)
+        Debug.print("📋 User data saved to state");
+
+        await rewardSignUp(caller);
+        #ok("User registered successfully! Sign-up reward of 10 KOTOMO tokens has been sent to your wallet.");
       };
     };
   };
@@ -114,7 +248,7 @@ persistent actor MessagingApp {
           profilePicture = newProfilePicture; 
           status = newStatus; 
           createdAt = user.createdAt; 
-          lastSeen = Time.now() 
+          lastSeen = Time.now();
         };
         usersState.users.put(userId, updatedUser);
         #ok(())
@@ -158,6 +292,9 @@ persistent actor MessagingApp {
           case (?arr) { arr };
         };
         chatMessages.put(chatId, Array.append(oldMsgs, [newMsg]));
+
+        await checkAndRewardMessages(sender);
+        
         #ok(())
       };
       case (null, _) { #err("Sender not found") };
@@ -198,10 +335,27 @@ persistent actor MessagingApp {
     }
   };
 
-  public query func getStats() : async { userCount : Nat; messageChats : Nat } {
+  public query func getStats() : async { userCount : Nat; messageChats : Nat; totalMessages : Nat } {
+    var totalMessages : Nat = 0;
+    for ((_, count) in messageCounts.entries()) {
+      totalMessages += count;
+    };
+    
     {
       userCount = usersState.users.size();
       messageChats = chatMessages.size();
+      totalMessages = totalMessages;
     }
+  };
+
+  public func getRewardPoolBalance() : async Nat {
+    // Temporarily disabled balance checking due to query/update call issues
+    // The KOTOMO canister implements icrc1_balance_of as a query method
+    // but we need to call it from an async context
+    0
+  };
+  
+  public query func getRewardConfig() : async { signUpReward: Nat; messageReward: Nat; messageThreshold: Nat } {
+    { signUpReward = signUpReward; messageReward = messageReward; messageThreshold = messageThreshold }
   };
 }

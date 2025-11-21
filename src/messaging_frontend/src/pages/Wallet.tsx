@@ -1,334 +1,276 @@
-import { useState } from 'react';
+import React, { useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Textarea } from "../components/ui/textarea";
-import { ArrowLeft, Wallet, Send, History, RefreshCw, Copy, ExternalLink, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { useWallet } from "../context/WalletContext";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { ArrowLeft, Wallet, Loader2, Send, RefreshCw } from "lucide-react";
+import { useAuth } from "../context/AppContext";
+import { useKotomo } from "../hooks/useKotomo";
+import { Principal } from "@dfinity/principal";
 
 interface WalletPageProps {
   onBack: () => void;
 }
 
 export function WalletPage({ onBack }: WalletPageProps) {
+  const { identity } = useAuth();
   const {
+    tokenInfo,
     balance,
     transactions,
-    isLoading,
+    loading,
     error,
-    refreshBalance,
-    sendICP,
-    formatICP,
-    formatUSD,
-    validateAddress
-  } = useWallet();
+    loadTokenInfo,
+    loadBalance,
+    loadTransactions,
+    sendTokens
+  } = useKotomo();
 
-  const [sendForm, setSendForm] = useState({
-    recipient: '',
-    amount: '',
-    memo: ''
-  });
-  const [sendLoading, setSendLoading] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendAmount, setSendAmount] = React.useState('');
+  const [recipientAddress, setRecipientAddress] = React.useState('');
+  const [sendLoading, setSendLoading] = React.useState(false);
 
-  const handleSendSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSendLoading(true);
-    setSendError(null);
+  useEffect(() => {
+    if (identity) {
+      loadTokenInfo();
+      loadBalance();
+      loadTransactions();
+    }
+  }, [identity, loadTokenInfo, loadBalance, loadTransactions]);
 
-    const amount = parseFloat(sendForm.amount);
-    if (isNaN(amount) || amount <= 0) {
-      setSendError('Please enter a valid amount');
+  const handleSend = async () => {
+    if (!sendAmount || !recipientAddress) return;
+
+    try {
+      setSendLoading(true);
+      const recipientPrincipal = Principal.fromText(recipientAddress);
+      await sendTokens(recipientPrincipal, BigInt(parseFloat(sendAmount) * Math.pow(10, tokenInfo?.decimals || 8)));
+      setSendAmount('');
+      setRecipientAddress('');
+      // Refresh balance and transactions
+      loadBalance();
+      loadTransactions();
+    } catch (err) {
+      console.error('Failed to send tokens:', err);
+    } finally {
       setSendLoading(false);
-      return;
-    }
-
-    // Convert ICP to e8s
-    const amountInE8s = Math.floor(amount * 100000000);
-
-    const success = await sendICP(sendForm.recipient, amountInE8s, sendForm.memo || undefined);
-    
-    if (success) {
-      setSendForm({ recipient: '', amount: '', memo: '' });
-      alert('Transaction sent successfully!');
-    } else {
-      setSendError('Failed to send transaction');
-    }
-
-    setSendLoading(false);
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'send':
-        return <TrendingDown className="h-4 w-4 text-red-500" />;
-      case 'receive':
-        return <TrendingUp className="h-4 w-4 text-green-500" />;
-      case 'fee':
-        return <DollarSign className="h-4 w-4 text-gray-500" />;
-      default:
-        return <History className="h-4 w-4 text-blue-500" />;
     }
   };
 
-  return (
-    <div className="min-h-full bg-blue-50">
-      {/* Header */}
-      <div className="bg-white border-b border-blue-200 p-4 shadow-sm sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="h-9 w-9 text-blue-900 hover:text-blue-700 hover:bg-blue-100"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold text-blue-900">Wallet</h1>
-            <p className="text-sm text-blue-600">Manage your ICP tokens</p>
-          </div>
-        </div>
-      </div>
+  const handleRefresh = () => {
+    loadBalance();
+    loadTransactions();
+  };
 
-      {/* Content */}
-      <div className="p-4 max-w-4xl mx-auto pb-8">
-        {/* Balance Overview */}
-        <Card className="bg-white border-blue-200 shadow-sm mb-6">
-          <CardHeader className="border-b border-blue-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-blue-900" />
-                <CardTitle className="text-blue-900">Balance</CardTitle>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshBalance}
-                disabled={isLoading}
-                className="text-blue-900 border-blue-300 hover:bg-blue-50"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="text-center p-6 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-600 mb-2">ICP Balance</p>
-                <p className="text-3xl font-bold text-blue-900">
-                  {isLoading ? 'Loading...' : formatICP(balance.icp)}
-                </p>
-              </div>
-              <div className="text-center p-6 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm text-green-600 mb-2">USD Value</p>
-                <p className="text-3xl font-bold text-green-900">
-                  {isLoading ? 'Loading...' : formatUSD(balance.usd)}
-                </p>
-              </div>
-            </div>
-            {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg">
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
-            )}
+  const formatBalance = (amount: bigint, decimals: number = 8): string => {
+    const divisor = BigInt(Math.pow(10, decimals));
+    const whole = amount / divisor;
+    const fractional = amount % divisor;
+    return `${whole.toString()}.${fractional.toString().padStart(decimals, '0').replace(/0+$/, '') || '0'}`;
+  };
+
+  const formatTimestamp = (timestamp: bigint): string => {
+    const date = new Date(Number(timestamp / BigInt(1000000))); // Convert nanoseconds to milliseconds
+    return date.toLocaleString();
+  };
+
+  if (!identity) {
+    return (
+      <div className="min-h-full bg-blue-50 flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="pt-6 text-center">
+            <Wallet className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-sm text-gray-600">Please log in to access your wallet</p>
           </CardContent>
         </Card>
-
-        {/* Wallet Tabs */}
-        <Tabs defaultValue="send" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 bg-white border-blue-200">
-            <TabsTrigger value="send" className="flex items-center gap-2 text-blue-900 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Send className="h-4 w-4" />
-              Send ICP
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2 text-blue-900 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <History className="h-4 w-4" />
-              Transaction History
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Send ICP Tab */}
-          <TabsContent value="send">
-            <Card className="bg-white border-blue-200 shadow-sm">
-              <CardHeader className="border-b border-blue-100">
-                <CardTitle className="text-blue-900">Send ICP</CardTitle>
-                <CardDescription className="text-blue-600">
-                  Transfer ICP tokens to another address
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 pt-6">
-                <form onSubmit={handleSendSubmit} className="space-y-4">
-                  {/* Recipient */}
-                  <div className="space-y-2">
-                    <Label htmlFor="recipient" className="text-blue-900 font-medium">Recipient Address</Label>
-                    <Input
-                      id="recipient"
-                      value={sendForm.recipient}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendForm(prev => ({ ...prev, recipient: e.target.value }))}
-                      placeholder="Enter Principal ID or Account Identifier"
-                      className="border-blue-200 focus:border-blue-500 text-blue-900"
-                      required
-                    />
-                    {sendForm.recipient && !validateAddress(sendForm.recipient) && (
-                      <p className="text-red-600 text-sm">Invalid address format</p>
-                    )}
-                  </div>
-
-                  {/* Amount */}
-                  <div className="space-y-2">
-                    <Label htmlFor="amount" className="text-blue-900 font-medium">Amount (ICP)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.00000001"
-                      min="0.00000001"
-                      value={sendForm.amount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendForm(prev => ({ ...prev, amount: e.target.value }))}
-                      placeholder="0.00000000"
-                      className="border-blue-200 focus:border-blue-500 text-blue-900"
-                      required
-                    />
-                    <p className="text-xs text-blue-600">
-                      Available: {formatICP(balance.icp)}
-                    </p>
-                  </div>
-
-                  {/* Memo */}
-                  <div className="space-y-2">
-                    <Label htmlFor="memo" className="text-blue-900 font-medium">Memo (Optional)</Label>
-                    <Textarea
-                      id="memo"
-                      value={sendForm.memo}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSendForm(prev => ({ ...prev, memo: e.target.value }))}
-                      placeholder="Add a note for this transaction..."
-                      rows={3}
-                      className="border-blue-200 focus:border-blue-500 text-blue-900 resize-none"
-                    />
-                  </div>
-
-                  {/* Transaction Fee Notice */}
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-800 text-sm">
-                      <strong>Transaction Fee:</strong> 0.0001 ICP will be deducted as network fee
-                    </p>
-                  </div>
-
-                  {sendError && (
-                    <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
-                      <p className="text-red-700 text-sm">{sendError}</p>
-                    </div>
-                  )}
-
-                  {/* Send Button */}
-                  <Button
-                    type="submit"
-                    disabled={sendLoading || !sendForm.recipient || !sendForm.amount || !validateAddress(sendForm.recipient)}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
-                  >
-                    {sendLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send ICP
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Transaction History Tab */}
-          <TabsContent value="history">
-            <Card className="bg-white border-blue-200 shadow-sm">
-              <CardHeader className="border-b border-blue-100">
-                <CardTitle className="text-blue-900">Transaction History</CardTitle>
-                <CardDescription className="text-blue-600">
-                  Your recent ICP transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {transactions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <History className="h-12 w-12 text-blue-300 mx-auto mb-4" />
-                    <p className="text-blue-600 mb-2">No transactions yet</p>
-                    <p className="text-sm text-blue-500">Your transaction history will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {transactions.map((tx: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-3">
-                          {getTransactionIcon(tx.type)}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-blue-900 capitalize">{tx.type}</p>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                tx.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {tx.status}
-                              </span>
-                            </div>
-                            <p className="text-sm text-blue-600">{formatDate(tx.timestamp)}</p>
-                            {tx.memo && (
-                              <p className="text-xs text-blue-500 mt-1">{tx.memo}</p>
-                            )}
-                            {(tx.to || tx.from) && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-xs text-blue-500 font-mono">
-                                  {tx.to ? `To: ${tx.to.slice(0, 20)}...` : `From: ${tx.from?.slice(0, 20)}...`}
-                                </p>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyToClipboard(tx.to || tx.from || '')}
-                                  className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`font-bold ${
-                            tx.type === 'send' || tx.type === 'fee' ? 'text-red-600' : 'text-green-600'
-                          }`}>
-                            {tx.type === 'send' || tx.type === 'fee' ? '-' : '+'}
-                            {formatICP(tx.amount)}
-                          </p>
-                          {tx.blockHeight && (
-                            <p className="text-xs text-blue-500">Block #{tx.blockHeight}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">KOTOMO Wallet</h1>
+        </div>
+        <Button onClick={handleRefresh} disabled={loading} size="sm" variant="outline">
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Token Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Token Information</CardTitle>
+          <CardDescription>KOTOMO token details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && !tokenInfo ? (
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading token information...</span>
+            </div>
+          ) : tokenInfo ? (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Name:</span> {tokenInfo.name}
+              </div>
+              <div>
+                <span className="font-medium">Symbol:</span> {tokenInfo.symbol}
+              </div>
+              <div>
+                <span className="font-medium">Decimals:</span> {tokenInfo.decimals}
+              </div>
+              <div>
+                <span className="font-medium">Fee:</span> {formatBalance(tokenInfo.fee, tokenInfo.decimals)} {tokenInfo.symbol}
+              </div>
+              <div>
+                <span className="font-medium">Total Supply:</span> {formatBalance(tokenInfo.totalSupply, tokenInfo.decimals)} {tokenInfo.symbol}
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Balance */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Balance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading && balance === null ? (
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading balance...</span>
+            </div>
+          ) : balance !== null && tokenInfo ? (
+            <div className="text-2xl font-bold">
+              {formatBalance(balance, tokenInfo.decimals)} {tokenInfo.symbol}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Send Tokens */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Tokens</CardTitle>
+          <CardDescription>Transfer KOTOMO tokens to another address</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="recipient">Recipient Address</Label>
+            <Input
+              id="recipient"
+              placeholder="Enter principal ID"
+              value={recipientAddress}
+              onChange={(e) => setRecipientAddress(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="amount">Amount</Label>
+            <Input
+              id="amount"
+              type="number"
+              placeholder="0.00"
+              value={sendAmount}
+              onChange={(e) => setSendAmount(e.target.value)}
+            />
+          </div>
+          <Button 
+            onClick={handleSend} 
+            disabled={!sendAmount || !recipientAddress || sendLoading}
+            className="w-full"
+          >
+            {sendLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                Send Tokens
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Transaction History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transaction History</CardTitle>
+          <CardDescription>Recent KOTOMO token transactions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && transactions.length === 0 ? (
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading transactions...</span>
+            </div>
+          ) : transactions.length > 0 && tokenInfo ? (
+            <div className="space-y-3">
+              {transactions.map((tx) => (
+                <div key={tx.id.toString()} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium capitalize">
+                        {tx.kind}
+                        {tx.kind === 'transfer' && tx.from && tx.to && (
+                          <span className="text-sm text-gray-500 ml-2">
+                            {tx.from.toString() === identity?.getPrincipal().toString() ? 'Sent' : 'Received'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {formatTimestamp(tx.timestamp)}
+                      </div>
+                      {tx.from && (
+                        <div className="text-xs text-gray-500">
+                          From: {tx.from.toString().slice(0, 20)}...
+                        </div>
+                      )}
+                      {tx.to && (
+                        <div className="text-xs text-gray-500">
+                          To: {tx.to.toString().slice(0, 20)}...
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatBalance(tx.amount, tokenInfo.decimals)} {tokenInfo.symbol}
+                      </div>
+                      {tx.fee && tx.fee > 0n ? (
+                        <div className="text-xs text-gray-500">
+                          Fee: {formatBalance(tx.fee, tokenInfo.decimals)} {tokenInfo.symbol}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">No transactions found</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

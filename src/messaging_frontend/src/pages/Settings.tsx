@@ -16,7 +16,6 @@ function Settings() {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState("");
-  const [profilePicture, setProfilePicture] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +37,6 @@ function Settings() {
           setCurrentUser(userData ?? null);
           setUsername(userData?.username ?? "");
           setStatus(userData?.status ?? "");
-          setProfilePicture(userData?.profilePicture ?? "");
         }
       } catch (err) {
         console.log("Error loading user data:", err);
@@ -60,7 +58,7 @@ function Settings() {
       setSaving(true);
       const result = await backendActor.updateProfile(
         username,
-        profilePicture,
+        "", // Empty string for profile picture since we're not using it
         status
       );
       
@@ -118,7 +116,7 @@ function Settings() {
           <div className="flex items-center gap-6 mb-8">
             <div className="relative">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={profilePicture} />
+                <AvatarImage src={""} />
                 <AvatarFallback className="bg-blue-100 text-blue-900 text-xl">
                   {currentUser ? getInitials(currentUser.username) : <User className="h-8 w-8" />}
                 </AvatarFallback>
@@ -177,17 +175,17 @@ function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="profilePicture" className="text-blue-900 font-medium">
-                Profile Picture URL
+              <Label htmlFor="principalId" className="text-blue-900 font-medium">
+                Principal ID
               </Label>
-              <Input
-                type="url"
-                id="profilePicture"
-                value={profilePicture}
-                onChange={(e) => setProfilePicture(e.target.value)}
-                className="mt-1 bg-blue-50 border-gray-300 focus:border-blue-500 text-blue-900"
-                placeholder="https://example.com/avatar.jpg"
-              />
+              <div className="mt-1 p-3 bg-gray-50 border border-gray-300 rounded-md">
+                <p className="text-sm text-gray-900 font-mono break-all">
+                  {identity?.getPrincipal().toText() || 'Not available'}
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                This is your unique identifier on the Internet Computer
+              </p>
             </div>
 
             <Button
