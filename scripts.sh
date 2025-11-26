@@ -18,4 +18,4 @@ dfx deploy kotomo --argument "(variant {Init =
       controller_id = principal \"$(dfx identity --identity wande get-principal)\";
     };
   }
-})"
+})" --network ic --with-cycles 1_500_000_000_000 --no-wallet
