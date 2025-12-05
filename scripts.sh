@@ -15,7 +15,9 @@ dfx deploy kotomo --argument "(variant {Init =
     archive_options = record {
       num_blocks_to_archive = 1000;
       trigger_threshold = 2000;
-      controller_id = principal \"$(dfx identity --identity wande get-principal)\";
+      controller_id = principal \"$(dfx identity --identity default get-principal)\";
     };
   }
-})" --network ic --with-cycles 1_500_000_000_000 --no-wallet
+})"
+
+ --network ic --with-cycles 1_500_000_000_000 --no-wallet

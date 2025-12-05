@@ -85,8 +85,7 @@ export const useAuthClient = (options = defaultOptions) => {
     useState<ActorSubclass<_SERVICE> | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
-
-  // Helper function to convert BigInt values to strings for JSON serialization
+  
   const serializeUser = (user: any) => {
     return JSON.parse(JSON.stringify(user, (key, value) =>
       typeof value === 'bigint' ? value.toString() : value
@@ -129,7 +128,6 @@ export const useAuthClient = (options = defaultOptions) => {
         identity: _identity,
       });
 
-      // For local development, fetch root key to bypass certificate verification
       if (network === "local") {
         try {
           await agent.fetchRootKey();
@@ -149,7 +147,6 @@ export const useAuthClient = (options = defaultOptions) => {
       );
       setBackendActor(_backendActor);
 
-      // Handle session restoration for authenticated users
       if (isAuthenticated) {
         await restoreUserSession(_backendActor, _identity);
       }
@@ -158,12 +155,10 @@ export const useAuthClient = (options = defaultOptions) => {
     }
   }
 
-  // Comprehensive session restoration function
   const restoreUserSession = async (actor: ActorSubclass<_SERVICE>, identity: Identity) => {
     try {
       const principal = identity.getPrincipal();
-      
-      // Try to restore from localStorage first
+
       const storedUser = localStorage.getItem('messagingAppUser');
       let userFromStorage = null;
       
@@ -177,7 +172,6 @@ export const useAuthClient = (options = defaultOptions) => {
         }
       }
 
-      // Always validate with backend to ensure user still exists
       const userData = await actor.getUser(principal);
       
       if (userData && userData.length > 0) {
@@ -186,11 +180,9 @@ export const useAuthClient = (options = defaultOptions) => {
           ...userData[0] 
         };
         const serializedUser = serializeUser(user);
-        
-        // Update current user state
+
         setCurrentUser(serializedUser);
-        
-        // Update localStorage with fresh data
+
         localStorage.setItem('messagingAppUser', JSON.stringify(serializedUser));
         
         console.log("User session restored successfully:", serializedUser.username);
@@ -199,16 +191,13 @@ export const useAuthClient = (options = defaultOptions) => {
         // This will be handled by the Index component when it detects currentUser is set
         
       } else {
-        // User doesn't exist in backend - this is a new user
-        // Clear any stale localStorage data
         if (userFromStorage) {
           console.warn("User no longer exists in backend, clearing stored data");
           localStorage.removeItem('messagingAppUser');
           localStorage.removeItem('selectedConversationId');
         }
         
-        // For new users, we need to trigger registration
-        // This will be handled by the frontend when currentUser is null
+
         setCurrentUser(null);
         console.log("New user detected - registration required for rewards");
       }
@@ -250,8 +239,7 @@ export const useAuthClient = (options = defaultOptions) => {
         const serializedUser = serializeUser(user);
         setCurrentUser(serializedUser);
         localStorage.setItem('messagingAppUser', JSON.stringify(serializedUser));
-        
-        // Show reward notification
+
         console.log("✅ " + result.ok);
         
         return result;

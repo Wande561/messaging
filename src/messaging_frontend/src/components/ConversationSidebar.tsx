@@ -32,6 +32,7 @@ interface ConversationSidebarProps {
   onSettingsClick?: () => void;
   onAddUserClick?: () => void;
   onWalletClick?: () => void;
+  isMobile?: boolean;
 }
 
 export interface ConversationSidebarRef {
@@ -39,7 +40,7 @@ export interface ConversationSidebarRef {
 }
 
 export const ConversationSidebar = forwardRef<ConversationSidebarRef, ConversationSidebarProps>(
-  ({ selectedConversationId, onConversationSelect, onConversationsLoaded, onSettingsClick, onAddUserClick, onWalletClick }, ref) => {
+  ({ selectedConversationId, onConversationSelect, onConversationsLoaded, onSettingsClick, onAddUserClick, onWalletClick, isMobile = false }, ref) => {
   const { logout, searchUsers, getUserConversations, getUser, identity, backendActor } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -153,49 +154,49 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
   };
 
   return (
-    <div className="w-80 h-full bg-white border-r border-gray-200 flex flex-col">
+    <div className={`${isMobile ? 'w-full' : 'w-80'} h-full bg-white border-r border-gray-200 flex flex-col`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-blue-900">Messages</h2>
-          <div className="flex gap-2">
+      <div className="p-3 md:p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold text-blue-900">Messages</h2>
+          <div className="flex gap-1 md:gap-2">
             {conversations.length === 0 && (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={onAddUserClick}
-                className="h-8 w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
+                className="h-7 w-7 md:h-8 md:w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
                 title="Add New Contact"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5 md:h-4 md:w-4" />
               </Button>
             )}
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={onWalletClick}
-              className="h-8 w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
+              className="h-7 w-7 md:h-8 md:w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
               title="Wallet"
             >
-              <Wallet className="h-4 w-4" />
+              <Wallet className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={onSettingsClick}
-              className="h-8 w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
+              className="h-7 w-7 md:h-8 md:w-8 text-blue-900 hover:text-blue-700 hover:bg-gray-100"
               title="Settings"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={handleLogout}
-              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="h-7 w-7 md:h-8 md:w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
               title="Logout"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
         </div>
@@ -205,7 +206,7 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-900" />
           <Input
             placeholder="Search users..."
-            className="pl-10 bg-blue-50 border-gray-300 focus:border-blue-500 text-blue-900"
+            className="pl-10 bg-blue-50 border-gray-300 focus:border-blue-500 text-blue-900 text-sm md:text-base"
             value={searchQuery}
             onChange={handleSearchInputChange}
           />
@@ -235,10 +236,10 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
                   onClick={() => handleStartConversation(result)}
                   className="flex items-center gap-3 p-2 cursor-pointer hover:bg-white rounded-lg transition-colors"
                 >
-                  <div className="relative">
-                    <Avatar className="h-10 w-10">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-9 w-9 md:h-10 md:w-10">
                       <AvatarImage src={result.user.profilePicture} />
-                      <AvatarFallback className="bg-blue-100 text-blue-900">
+                      <AvatarFallback className="bg-blue-100 text-blue-900 text-xs">
                         {result.user.username.split(' ').map(n => n[0]).join('').toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -251,7 +252,7 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
                       <h4 className="font-medium text-sm text-gray-900 truncate">
                         {result.user.username}
                       </h4>
-                      <UserPlus className="h-3 w-3 text-blue-500" />
+                      <UserPlus className="h-3 w-3 text-blue-500 flex-shrink-0" />
                     </div>
                     <p className="text-xs text-gray-500 truncate">
                       {result.user.status}
@@ -311,36 +312,36 @@ export const ConversationSidebar = forwardRef<ConversationSidebarRef, Conversati
                 <div
                   key={conversation.id}
                   onClick={() => onConversationSelect(conversation.id)}
-                  className={`p-4 cursor-pointer transition-all duration-200 border-b border-gray-100 hover:bg-gray-50 ${
+                  className={`p-3 md:p-4 cursor-pointer transition-all duration-200 border-b border-gray-100 hover:bg-gray-50 active:bg-gray-100 ${
                     selectedConversationId === conversation.id 
                       ? "bg-blue-50 border-l-4 border-l-blue-500" 
                       : ""
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-12 w-12">
+                  <div className="flex items-start gap-2 md:gap-3">
+                    <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0">
                       <AvatarImage src={conversation.avatar} />
-                      <AvatarFallback className="bg-blue-100 text-blue-900">
+                      <AvatarFallback className="bg-blue-100 text-blue-900 text-xs md:text-sm">
                         {conversation.name.split(' ').map((n: string) => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-small text-blue-900 truncate">
+                        <h3 className="font-medium text-sm md:text-base text-blue-900 truncate">
                           {conversation.name}
                         </h3>
-                        <span className="text-xs text-gray-600">
+                        <span className="text-xs text-gray-600 flex-shrink-0 ml-2">
                           {conversation.timestamp}
                         </span>
                       </div>
                       
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600 truncate">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs md:text-sm text-gray-600 truncate flex-1">
                           {conversation.lastMessage}
                         </p>
                         {conversation.unreadCount && conversation.unreadCount > 0 && (
-                          <span className="bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded-full min-w-[20px] text-center">
+                          <span className="bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded-full min-w-[20px] text-center flex-shrink-0">
                             {conversation.unreadCount}
                           </span>
                         )}

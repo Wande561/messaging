@@ -44,8 +44,8 @@ persistent actor MessagingApp {
   type Message = Types.Message;
   type PublicUser = Types.PublicUser;
 
-  let signUpReward : Nat = 1_000_000_000; // 10 KOTOMO tokens instead of 50
-  let messageReward : Nat = 2_000_000_000;  // 20 KOTOMO tokens instead of 100
+  let signUpReward : Nat = 1_000_000_000; 
+  let messageReward : Nat = 2_000_000_000;  
   let messageThreshold : Nat = 50;
 
   var messageCountEntries : [(Principal, Nat)] = [];

@@ -6,16 +6,19 @@ import { WalletPage } from "./Wallet";
 import { useAuth } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { Principal } from "@dfinity/principal";
+import { useIsMobile } from "../hooks/use-mobile";
 
 const Index = () => {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'chat' | 'addUser' | 'settings' | 'wallet'>('chat');
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
-  const [manuallySelected, setManuallySelected] = useState(false); 
+  const [manuallySelected, setManuallySelected] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(true);
   const { isAuthenticated, getUser, currentUser } = useAuth();
   const navigate = useNavigate();
   const conversationSidebarRef = useRef<ConversationSidebarRef>(null);
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     if (currentUser && conversationsLoaded && !selectedConversationId && !manuallySelected) {
@@ -108,6 +111,15 @@ const Index = () => {
     setManuallySelected(true); 
     setSelectedConversationId(conversationId);
     localStorage.setItem('selectedConversationId', conversationId);
+    
+    // On mobile, switch to chat view when conversation is selected
+    if (isMobile) {
+      setShowMobileSidebar(false);
+    }
+  };
+
+  const handleBackToSidebar = () => {
+    setShowMobileSidebar(true);
   };
 
   const handleConversationsLoaded = (conversations: any[]) => {
@@ -175,22 +187,55 @@ const Index = () => {
 
   return (
     <div className="h-screen bg-white flex overflow-hidden">
-      <ConversationSidebar 
-        ref={conversationSidebarRef}
-        selectedConversationId={selectedConversationId}
-        onConversationSelect={handleConversationSelect}
-        onConversationsLoaded={handleConversationsLoaded}
-        onAddUserClick={handleAddUserClick}
-        onSettingsClick={handleSettingsClick}
-        onWalletClick={handleWalletClick}
-      />
-      <ChatArea 
-        conversationId={selectedConversationId || undefined}
-        conversationName={selectedUser?.username || "Select Conversation"}
-        conversationAvatar={selectedUser?.profilePicture || "/placeholder.svg"}
-        isOnline={selectedUser?.online || false}
-        onMessageSent={handleMessageSent}
-      />
+      {/* Mobile layout - toggle between sidebar and chat */}
+      {isMobile ? (
+        <>
+          {showMobileSidebar ? (
+            <ConversationSidebar 
+              ref={conversationSidebarRef}
+              selectedConversationId={selectedConversationId}
+              onConversationSelect={handleConversationSelect}
+              onConversationsLoaded={handleConversationsLoaded}
+              onAddUserClick={handleAddUserClick}
+              onSettingsClick={handleSettingsClick}
+              onWalletClick={handleWalletClick}
+              isMobile={isMobile}
+            />
+          ) : (
+            <ChatArea 
+              conversationId={selectedConversationId || undefined}
+              conversationName={selectedUser?.username || "Select Conversation"}
+              conversationAvatar={selectedUser?.profilePicture || "/placeholder.svg"}
+              isOnline={selectedUser?.online || false}
+              onMessageSent={handleMessageSent}
+              onBackClick={handleBackToSidebar}
+              isMobile={isMobile}
+            />
+          )}
+        </>
+      ) : (
+        /* Desktop layout - show both sidebar and chat */
+        <>
+          <ConversationSidebar 
+            ref={conversationSidebarRef}
+            selectedConversationId={selectedConversationId}
+            onConversationSelect={handleConversationSelect}
+            onConversationsLoaded={handleConversationsLoaded}
+            onAddUserClick={handleAddUserClick}
+            onSettingsClick={handleSettingsClick}
+            onWalletClick={handleWalletClick}
+            isMobile={isMobile}
+          />
+          <ChatArea 
+            conversationId={selectedConversationId || undefined}
+            conversationName={selectedUser?.username || "Select Conversation"}
+            conversationAvatar={selectedUser?.profilePicture || "/placeholder.svg"}
+            isOnline={selectedUser?.online || false}
+            onMessageSent={handleMessageSent}
+            isMobile={isMobile}
+          />
+        </>
+      )}
     </div>
   );
 };
